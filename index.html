@@ -3,12 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ECG Ultimate Learning — aprenda a ler eletrocardiograma do zero</title>
+<title>ECG Ultimate Learning: aprenda a ler eletrocardiograma do zero</title>
 <meta name="description" content="Curso interativo de eletrocardiograma para estudantes de medicina do ciclo clínico. Traçados manipuláveis, paquímetro, eixo elétrico, casos clínicos e questões comentadas.">
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#faf8f5">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%238c2b34'/%3E%3Cpath d='M3 18h5l3-9 4 16 3-11 2 4h9' fill='none' stroke='%23faf8f5' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 24'%3E%3Cpath d='M2 15h9.4q2.5-4 5 0h2.4l1.2 3L23.8 4L26 15h3c1.6 0 2.2-5.6 4.4-5.6s2.8 5.6 4.4 5.6H42' fill='none' stroke='%23c2352b' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="./src/css/app.css">
+<!-- Refino tipográfico e de responsividade. Vem DEPOIS de app.css de propósito:
+     ele corrige defeitos daquela folha sem reescrevê-la. -->
+<link rel="stylesheet" href="./src/css/refino.css">
 </head>
 <body>
 <a class="pular-para" href="#principal">Pular para o conteúdo</a>
@@ -18,9 +21,11 @@
   <header class="topo">
     <div class="topo-interno">
       <div class="marca">
-        <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
-          <rect width="32" height="32" rx="7" fill="#8c2b34"/>
-          <path d="M3 18h5l3-9 4 16 3-11 2 4h9" fill="none" stroke="#faf8f5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <svg class="marca-mark" viewBox="0 0 44 24" height="22" role="img"
+             aria-label="ECG Ultimate Learning" focusable="false">
+          <path d="M2 15h9.4q2.5-4 5 0h2.4l1.2 3L23.8 4L26 15h3c1.6 0 2.2-5.6 4.4-5.6s2.8 5.6 4.4 5.6H42"
+                fill="none" stroke="currentColor" stroke-width="2.2"
+                stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         <div>
           <div class="marca-nome">ECG Ultimate Learning</div>
@@ -43,7 +48,7 @@
     <div class="rodape-interno prosa empilha">
       <p>
         <strong>Os traçados deste site são sintéticos.</strong> São gerados por equações a partir de
-        parâmetros clínicos, para ensinar o padrão de cada diagnóstico — não são registros de
+        parâmetros clínicos, para ensinar o padrão de cada diagnóstico. Não são registros de
         pacientes, não têm a variabilidade de um traçado real e não substituem a leitura de um ECG
         de 12 derivações calibrado. Um padrão aprendido aqui precisa ser reconhecido depois em
         traçado real, com ruído, artefato e apresentação atípica.
@@ -52,7 +57,7 @@
         Material de estudo produzido por estudante, para estudantes. Não é diretriz, não é fonte
         primária e não serve para decisão clínica. Onde as fontes do curso divergem entre si ou das
         diretrizes nacionais, o site mostra a divergência em vez de escolher um lado em silêncio.
-        Encontrou erro? Abra uma <em>issue</em> no repositório — correção de conteúdo médico é a
+        Encontrou erro? Abra uma <em>issue</em> no repositório. Correção de conteúdo médico é a
         contribuição mais valiosa que existe aqui.
       </p>
       <p class="miudo">

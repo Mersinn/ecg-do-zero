@@ -128,7 +128,7 @@ const DESAFIOS = [
     pedido: 'Produza o primeiro sinal eletrocardiográfico da hipercalemia.',
     dica: 'É uma alteração da onda T, não do ritmo.',
     testa: (p) => p.tAmp >= 8,
-    resposta: 'Onda T alta e apiculada — acima de ~8 mm já chama atenção. Na hipercalemia ela também é estreita e simétrica.',
+    resposta: 'Onda T alta e apiculada, acima de cerca de 8 mm já chama atenção. Na hipercalemia ela também é estreita e simétrica.',
   },
   {
     id: 'supra',
@@ -142,7 +142,7 @@ const DESAFIOS = [
     pedido: 'Produza uma onda P de sobrecarga atrial direita.',
     dica: 'A alteração da sobrecarga direita é de amplitude.',
     testa: (p) => p.pAmp > 2.5,
-    resposta: 'Onda P acima de 2,5 mm em DII — P pulmonale.',
+    resposta: 'Onda P acima de 2,5 mm em DII. P pulmonale.',
   },
 ];
 
@@ -152,16 +152,16 @@ const LAUDO_REGRAS = [
     rotulo: 'Ritmo',
     avaliar: (p) =>
       p.pAmp <= 0.2
-        ? { texto: 'Sem onda P identificável — não é possível afirmar ritmo sinusal.', status: 'alterado' }
+        ? { texto: 'Sem onda P identificável, não é possível afirmar ritmo sinusal.', status: 'alterado' }
         : { texto: 'Onda P presente antes de cada QRS, com PR constante: ritmo sinusal.', status: 'normal' },
   },
   {
     chave: 'fc',
     rotulo: 'Frequência',
     avaliar: (p) => {
-      if (p.fc < 60) return { texto: `${p.fc} bpm — bradicardia (abaixo de 60).`, status: 'alterado' };
-      if (p.fc > 100) return { texto: `${p.fc} bpm — taquicardia (acima de 100).`, status: 'alterado' };
-      return { texto: `${p.fc} bpm — dentro da faixa normal (60 a 100).`, status: 'normal' };
+      if (p.fc < 60) return { texto: `${p.fc} bpm, bradicardia (abaixo de 60).`, status: 'alterado' };
+      if (p.fc > 100) return { texto: `${p.fc} bpm, taquicardia (acima de 100).`, status: 'alterado' };
+      return { texto: `${p.fc} bpm, dentro da faixa normal (60 a 100).`, status: 'normal' };
     },
   },
   {
@@ -169,9 +169,9 @@ const LAUDO_REGRAS = [
     rotulo: 'Intervalo PR',
     avaliar: (p) => {
       const s = (p.pr / 1000).toFixed(2).replace('.', ',');
-      if (p.pr < 120) return { texto: `${s} s — PR curto. Pense em pré-excitação (WPW) ou ritmo juncional.`, status: 'alterado' };
-      if (p.pr > 200) return { texto: `${s} s — PR longo. Fixo e com todo P conduzindo, é BAV de 1º grau.`, status: 'alterado' };
-      return { texto: `${s} s — normal (0,12 a 0,20 s).`, status: 'normal' };
+      if (p.pr < 120) return { texto: `${s} s. PR curto. Pense em pré-excitação (WPW) ou ritmo juncional.`, status: 'alterado' };
+      if (p.pr > 200) return { texto: `${s} s. PR longo. Fixo e com todo P conduzindo, é BAV de 1º grau.`, status: 'alterado' };
+      return { texto: `${s} s, normal (0,12 a 0,20 s).`, status: 'normal' };
     },
   },
   {
@@ -179,9 +179,9 @@ const LAUDO_REGRAS = [
     rotulo: 'Duração do QRS',
     avaliar: (p) => {
       const s = (p.qrsMs / 1000).toFixed(2).replace('.', ',');
-      if (p.qrsMs >= 120) return { texto: `${s} s — QRS largo. Olhe V1 para separar bloqueio de ramo direito de esquerdo; se não houver P, considere origem ventricular.`, status: 'alterado' };
-      if (p.qrsMs >= 110) return { texto: `${s} s — no limite superior.`, status: 'limite' };
-      return { texto: `${s} s — estreito (abaixo de 0,12 s).`, status: 'normal' };
+      if (p.qrsMs >= 120) return { texto: `${s} s. QRS largo. Olhe V1 para separar bloqueio de ramo direito de esquerdo; se não houver P, considere origem ventricular.`, status: 'alterado' };
+      if (p.qrsMs >= 110) return { texto: `${s} s, no limite superior.`, status: 'limite' };
+      return { texto: `${s} s, estreito (abaixo de 0,12 s).`, status: 'normal' };
     },
   },
   {
@@ -189,9 +189,9 @@ const LAUDO_REGRAS = [
     rotulo: 'Segmento ST',
     avaliar: (p) => {
       const v = p.st.toFixed(1).replace('.', ',');
-      if (p.st >= 1) return { texto: `Supra de ${v} mm. Com clínica e em duas derivações contíguas, é critério de reperfusão — e o tempo passa a contar.`, status: 'alterado' };
+      if (p.st >= 1) return { texto: `Supra de ${v} mm. Com clínica e em duas derivações contíguas, é critério de reperfusão, e o tempo passa a contar.`, status: 'alterado' };
       if (p.st <= -1) return { texto: `Infra de ${Math.abs(p.st).toFixed(1).replace('.', ',')} mm. Isquemia subendocárdica: não se tromboliza, estratifica-se o risco.`, status: 'alterado' };
-      if (Math.abs(p.st) >= 0.5) return { texto: `Desvio de ${v} mm — limítrofe. Compare com traçado anterior.`, status: 'limite' };
+      if (Math.abs(p.st) >= 0.5) return { texto: `Desvio de ${v} mm, limítrofe. Compare com traçado anterior.`, status: 'limite' };
       return { texto: 'Isoelétrico.', status: 'normal' };
     },
   },
@@ -200,9 +200,9 @@ const LAUDO_REGRAS = [
     rotulo: 'Onda T',
     avaliar: (p) => {
       const v = p.tAmp.toFixed(1).replace('.', ',');
-      if (p.tAmp >= 8) return { texto: `${v} mm — T alta e apiculada. Em hipercalemia ela é estreita e simétrica; na isquemia hiperaguda, larga e assimétrica.`, status: 'alterado' };
-      if (p.tAmp <= 0.5) return { texto: `${v} mm — T achatada. Pense em hipocalemia (procure a onda U).`, status: 'alterado' };
-      return { texto: `${v} mm — amplitude normal, com morfologia assimétrica.`, status: 'normal' };
+      if (p.tAmp >= 8) return { texto: `${v} mm. T alta e apiculada. Em hipercalemia ela é estreita e simétrica; na isquemia hiperaguda, larga e assimétrica.`, status: 'alterado' };
+      if (p.tAmp <= 0.5) return { texto: `${v} mm. T achatada. Pense em hipocalemia (procure a onda U).`, status: 'alterado' };
+      return { texto: `${v} mm, amplitude normal, com morfologia assimétrica.`, status: 'normal' };
     },
   },
   {
@@ -210,9 +210,9 @@ const LAUDO_REGRAS = [
     rotulo: 'Onda P',
     avaliar: (p) => {
       const v = p.pAmp.toFixed(1).replace('.', ',');
-      if (p.pAmp > 2.5) return { texto: `${v} mm — P apiculada acima de 2,5 mm: sobrecarga atrial direita (P pulmonale).`, status: 'alterado' };
+      if (p.pAmp > 2.5) return { texto: `${v} mm. P apiculada acima de 2,5 mm: sobrecarga atrial direita (P pulmonale).`, status: 'alterado' };
       if (p.pAmp <= 0.2) return { texto: 'Onda P ausente ou não identificável.', status: 'alterado' };
-      return { texto: `${v} mm — normal (abaixo de 2,5 mm).`, status: 'normal' };
+      return { texto: `${v} mm, normal (abaixo de 2,5 mm).`, status: 'normal' };
     },
   },
 ];
@@ -226,7 +226,7 @@ export function criarGerador(container) {
     <div class="cartao empilha">
       <div>
         <h3 class="cartao-titulo">Gerador de traçado</h3>
-        <p class="cartao-sub">Mova os controles e leia o laudo, que muda junto. A marca vermelha em cada trilha é o limite do normal — você vê a fronteira antes de cruzá-la.</p>
+        <p class="cartao-sub">Mova os controles e leia o laudo, que muda junto. A marca vermelha em cada trilha é o limite do normal. Você vê a fronteira antes de cruzá-la.</p>
       </div>
       <div class="desafio" data-desafio hidden>
         <span class="desafio-texto" data-desafio-texto></span>
@@ -371,7 +371,7 @@ export function criarEixo(container) {
     <div class="cartao empilha">
       <div>
         <h3 class="cartao-titulo">Eixo elétrico em duas derivações</h3>
-        <p class="cartao-sub">DI e aVF sozinhos decidem o quadrante, porque estão a 0° e a 90° — são perpendiculares entre si. Inverta a polaridade e veja o vetor girar.</p>
+        <p class="cartao-sub">DI e aVF sozinhos decidem o quadrante, porque estão a 0° e a 90°: são perpendiculares entre si. Inverta a polaridade e veja o vetor girar.</p>
       </div>
       <div class="linha" data-presets></div>
       <div class="eixo-palco">
@@ -392,7 +392,7 @@ export function criarEixo(container) {
       </table>
       <div class="nota nota--info">
         <div class="nota-titulo">Segundo método</div>
-        Ache a derivação mais isoelétrica — aquela em que as deflexões positiva e negativa quase se
+        Ache a derivação mais isoelétrica: aquela em que as deflexões positiva e negativa quase se
         anulam. O eixo é perpendicular a ela. Duas rotas para o mesmo destino salvam quando uma
         trava na prova.
       </div>
@@ -483,7 +483,7 @@ export function criarEixo(container) {
     const r = eixoEletrico(di, avf);
     elRoda.innerHTML = rodaSVG(r.angulo, r) + miniTira('DI', di) + miniTira('aVF', avf);
 
-    elSaida.textContent = r.angulo == null ? 'Indeterminado — as duas derivações estão isoelétricas.' : `${r.rotulo} (${r.angulo}°)`;
+    elSaida.textContent = r.angulo == null ? 'Indeterminado: as duas derivações estão isoelétricas.' : `${r.rotulo} (${r.angulo}°)`;
     elSaida.dataset.status = r.quadrante === 'normal' ? 'normal' : 'alterado';
 
     elTabela.innerHTML = QUADRANTES.map((q) => {
@@ -503,20 +503,20 @@ export function criarEixo(container) {
 const MEDIDAS = {
   pr:  { nome: 'Intervalo PR',   min: 120, max: 200, unidade: 'ms',
          normal: 'PR normal (120 a 200 ms).',
-         baixo: 'PR curto — pense em pré-excitação ou ritmo juncional.',
-         alto: 'PR longo — acima de 200 ms. Fixo e com todo P conduzindo, é BAV de 1º grau.' },
+         baixo: 'PR curto, pense em pré-excitação ou ritmo juncional.',
+         alto: 'PR longo, acima de 200 ms. Fixo e com todo P conduzindo, é BAV de 1º grau.' },
   qrs: { nome: 'Duração do QRS', min: 0, max: 119, unidade: 'ms',
          normal: 'QRS estreito (abaixo de 120 ms).',
-         baixo: 'Medida implausível — reveja os marcadores.',
-         alto: 'QRS largo — 120 ms ou mais. Olhe V1 para separar BRD de BRE.' },
+         baixo: 'Medida implausível, reveja os marcadores.',
+         alto: 'QRS largo, 120 ms ou mais. Olhe V1 para separar BRD de BRE.' },
   qt:  { nome: 'Intervalo QT',   min: 300, max: 450, unidade: 'ms',
-         normal: 'QT dentro da faixa esperada — mas corrija pela frequência antes de concluir.',
+         normal: 'QT dentro da faixa esperada, mas corrija pela frequência antes de concluir.',
          baixo: 'QT curto. Abaixo de 340 ms, considere hipercalcemia ou síndrome do QT curto.',
          alto: 'QT longo. Corrija pela frequência: QTc acima de 500 ms indica risco alto de torsades.' },
   rr:  { nome: 'Intervalo RR',   min: 600, max: 1000, unidade: 'ms',
          normal: 'RR compatível com frequência entre 60 e 100 bpm.',
-         baixo: 'RR curto — taquicardia.',
-         alto: 'RR longo — bradicardia.' },
+         baixo: 'RR curto, taquicardia.',
+         alto: 'RR longo, bradicardia.' },
 };
 
 export function criarPaquimetro(container, { padraoChave = 'normal', montarRitmo } = {}) {
@@ -545,8 +545,8 @@ export function criarPaquimetro(container, { padraoChave = 'normal', montarRitmo
         <div class="ecg-dica-rolagem" data-toque-apenas>Arraste os marcadores azuis. A área vazia continua rolando o traçado.</div>
       </div>
       <div class="laudo">
-        <div class="laudo-linha"><span class="laudo-chave">Medida</span><span class="laudo-valor mono" data-medida>—</span></div>
-        <div class="laudo-linha"><span class="laudo-chave">Leitura</span><span class="laudo-valor" data-leitura>—</span></div>
+        <div class="laudo-linha"><span class="laudo-chave">Medida</span><span class="laudo-valor mono" data-medida>arraste os marcadores</span></div>
+        <div class="laudo-linha"><span class="laudo-chave">Leitura</span><span class="laudo-valor" data-leitura>sem medida ainda</span></div>
       </div>
       <div class="linha">
         <button class="btn btn--principal" data-aferir type="button">Me dê uma medida para fazer</button>
@@ -642,7 +642,7 @@ export function criarPaquimetro(container, { padraoChave = 'normal', montarRitmo
 
     if (medida === 'rr') {
       const fc = fcDeRR(ms);
-      texto = `${texto} Frequência derivada: ${fc} bpm. Pelas contas de bolso: 1500 ÷ ${(mm).toFixed(0)} quadradinhos, ou 300 ÷ ${quadradoes.toFixed(1)} quadradões. Nenhuma das duas vale se o ritmo for irregular — aí conte os QRS em 6 segundos e multiplique por 10.`;
+      texto = `${texto} Frequência derivada: ${fc} bpm. Pelas contas de bolso: 1500 ÷ ${(mm).toFixed(0)} quadradinhos, ou 300 ÷ ${quadradoes.toFixed(1)} quadradões. Nenhuma das duas vale se o ritmo for irregular. Aí conte os QRS em 6 segundos e multiplique por 10.`;
     }
     if (medida === 'qt') {
       texto += ` Bazett com RR de 860 ms daria QTc ≈ ${qtcBazett(ms, 860)} ms; Fridericia, ≈ ${qtcFridericia(ms, 860)} ms.`;
@@ -709,7 +709,7 @@ export function criarPaquimetro(container, { padraoChave = 'normal', montarRitmo
   });
 
   const ANCORAS = {
-    pr:  'do <strong>início da onda P</strong> ao <strong>início do QRS</strong> — não ao pico do R',
+    pr:  'do <strong>início da onda P</strong> ao <strong>início do QRS</strong>, não ao pico do R',
     qrs: 'do <strong>início</strong> ao <strong>fim do complexo</strong>, onde ele volta à linha de base',
     qt:  'do <strong>início do QRS</strong> ao <strong>fim da onda T</strong>, onde ela reencontra a linha de base',
     rr:  'de um <strong>pico R</strong> ao <strong>pico R seguinte</strong>',
@@ -722,7 +722,7 @@ export function criarPaquimetro(container, { padraoChave = 'normal', montarRitmo
     if (real == null) {
       elVeredito.innerHTML = `<div class="nota nota--atencao">
         <div class="nota-titulo">Não dá para aferir aqui</div>
-        Este traçado não tem ${m.nome.toLowerCase()} mensurável — por exemplo, não há onda P para
+        Este traçado não tem ${m.nome.toLowerCase()} mensurável, por exemplo, não há onda P para
         medir o PR. Escolha outra medida ou outro traçado.</div>`;
       modoAferido = false;
       alvo = null;

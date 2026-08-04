@@ -1,0 +1,601 @@
+/* ==========================================================================
+   ECG Ultimate Learning . camada de refino visual
+   --------------------------------------------------------------------------
+   Carregada DEPOIS de app.css, no mesmo <head>:
+
+       <link rel="stylesheet" href="./src/css/app.css">
+       <link rel="stylesheet" href="./src/css/refino.css">
+
+   Nada aqui reescreve app.css. Este arquivo entra nas MESMAS camadas
+   (@layer) que já existem, portanto ganha por ordem de origem, sem precisar
+   de especificidade artificial e sem !important (a única exceção está
+   marcada e explicada no bloco 5).
+
+   A camada `refino` declarada abaixo é acrescentada ao fim da ordem já
+   estabelecida por app.css (reset, tokens, base, layout, componentes, ecg,
+   ferramentas, utilidades). Ela existe só para as poucas regras que precisam
+   vencer `utilidades`.
+
+   Cada bloco diz qual defeito corrige.
+   ========================================================================== */
+
+@layer refino;
+
+/* ==========================================================================
+   BLOCO 1 . CAIXAS DE DESTAQUE
+   DEFEITO: "todas as caixas amarelas e azuis estão esquisitas, muito texto
+   para uma pessoa ler". Eram retângulos de fundo saturado, borda fechada em
+   volta, canto arredondado e corpo em --t--1 (menor que o texto ao redor).
+   Resultado: alerta de sistema operacional dentro de um cartão, ou seja
+   caixa dentro de caixa, e o trecho MAIS importante ficava com a letra MENOR
+   da tela.
+
+   CORREÇÃO: a caixa deixa de ser caixa. Sobra um filete lateral na cor
+   semântica, fundo do papel, tipografia um degrau MAIOR que a de antes,
+   entrelinha aberta e largura de leitura travada. É a nota de margem de
+   livro técnico que o autor pediu.
+   ========================================================================== */
+@layer componentes {
+  .nota,
+  .nota--info,
+  .nota--ok,
+  .nota--atencao,
+  .nota--perigo {
+    background: transparent;
+    border: 0;
+    border-left: 2px solid var(--nota-cor, var(--linha-2));
+    border-radius: 0;
+    padding: var(--e-1) 0 var(--e-1) var(--e-4);
+    font-size: var(--t-0);      /* era --t--1: o destaque era o menor texto da tela */
+    line-height: 1.62;
+    color: var(--tinta-2);
+    max-width: 58ch;            /* linha de leitura confortável, não a largura do cartão */
+  }
+
+  /* A cor semântica vira variável: quem pinta o filete e o título é a mesma
+     fonte de verdade, e o fundo saturado some de vez. */
+  .nota--info    { --nota-cor: var(--info); }
+  .nota--ok      { --nota-cor: var(--ok); }
+  .nota--atencao { --nota-cor: var(--atencao); }
+  .nota--perigo  { --nota-cor: var(--perigo); }
+
+  /* DEFEITO: rótulo em caixa alta espaçada em cada bloco (havia 16 no app,
+     todos em mono + uppercase + letter-spacing 0.1em). Vira frase normal,
+     com peso e cor fazendo o trabalho. */
+  .nota-titulo {
+    font-family: var(--ff-corpo);
+    font-size: var(--t-0);
+    font-weight: 660;
+    text-transform: none;
+    letter-spacing: -0.005em;
+    line-height: 1.35;
+    color: var(--nota-cor, var(--tinta));
+    margin-bottom: var(--e-1);
+  }
+
+  /* O conteúdo da nota costuma vir como texto solto depois do título, ou
+     como uma sequência de <p>. Os dois casos precisam respirar igual. */
+  .nota :is(p, li) { font-size: inherit; line-height: inherit; color: inherit; }
+  .nota :is(p, ul, ol) + :is(p, ul, ol) { margin-top: var(--e-3); }
+  .nota :is(ul, ol) { padding-left: 1.1rem; }
+  .nota strong, .nota b { color: var(--tinta); }
+  .nota > :last-child { margin-bottom: 0; }
+
+  /* Nota logo depois de outra nota: um filete por vez, com ar entre elas.
+     As frases-âncora da aula chegam em lista de .nota--info. */
+  .nota + .nota { margin-top: var(--e-4); }
+}
+
+/* As outras duas caixas coloridas do app, pelo mesmo motivo: painel de
+   explicação da anatomia e faixa de desafio do gerador. Ficavam com fundo
+   azul cheio dentro de um cartão branco. */
+@layer ecg {
+  .anat-explica {
+    background: transparent;
+    border: 0;
+    border-left: 2px solid var(--info);
+    border-radius: 0;
+    padding: var(--e-1) 0 var(--e-1) var(--e-4);
+  }
+  .anat-explica dt {
+    font-family: var(--ff-corpo);
+    font-size: var(--t--1);
+    font-weight: 650;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--tinta);
+  }
+  .anat-explica dd { color: var(--tinta-2); }
+  .anat-normal { border-top-color: var(--linha); font-size: var(--t--1); }
+}
+
+@layer ferramentas {
+  .desafio {
+    background: transparent;
+    border: 0;
+    border-left: 2px solid var(--info);
+    border-radius: 0;
+    padding: var(--e-2) 0 var(--e-2) var(--e-4);
+    font-size: var(--t-0);
+  }
+  .desafio-texto { font-size: inherit; }
+  .desafio[data-resolvido="true"] {
+    background: transparent;
+    border-left-color: var(--ok);
+  }
+}
+
+/* ==========================================================================
+   BLOCO 2 . HIERARQUIA TIPOGRÁFICA
+   DEFEITO: h1 660, h2 640, h3 620. Três pesos que o olho lê como o mesmo
+   peso, com tamanhos vizinhos (t-4 / t-3 / t-2) e todos na mesma cor. O
+   corpo era uniforme: o parágrafo de abertura tinha o mesmo tamanho do
+   décimo parágrafo.
+
+   CORREÇÃO: escada de quatro degraus com contraste real em PESO, TAMANHO e
+   COR, mais um degrau de espaço acima de cada nível. h3 desce para --t-1 em
+   peso 700: fica claramente subordinado ao h2 e ainda assim separado do
+   corpo. Nada de serifada: o display é sans e o contraste vem do peso, como
+   manda a regra do projeto.
+   ========================================================================== */
+@layer base {
+  h1 {
+    font-size: var(--t-4);
+    font-weight: 700;
+    letter-spacing: -0.042em;
+    line-height: 1.02;
+    color: var(--tinta);
+  }
+  h2 {
+    font-size: var(--t-3);
+    font-weight: 620;
+    letter-spacing: -0.028em;
+    line-height: 1.12;
+    color: var(--tinta);
+  }
+  h3 {
+    font-family: var(--ff-titulo);
+    font-size: var(--t-1);
+    font-weight: 700;
+    letter-spacing: -0.008em;
+    line-height: 1.3;
+    color: var(--tinta);
+  }
+  h4 {
+    font-size: var(--t-0);
+    font-weight: 700;
+    letter-spacing: 0;
+    color: var(--tinta-2);
+  }
+
+  /* PRIMEIRO PARÁGRAFO depois de h1 e de h2: corpo maior, medida mais curta,
+     cor um passo mais clara que o título. É o degrau que faltava entre
+     título e texto corrido. O restante do texto volta ao corpo normal. */
+  h1 + p {
+    font-size: var(--t-2);
+    line-height: 1.44;
+    font-weight: 400;
+    letter-spacing: -0.012em;
+    color: var(--tinta-2);
+    max-width: 46ch;
+    margin-top: var(--e-4);
+  }
+  h2 + p {
+    font-size: var(--t-1);
+    line-height: 1.5;
+    font-weight: 400;
+    letter-spacing: -0.006em;
+    color: var(--tinta-2);
+    max-width: 54ch;
+  }
+  /* Texto corrido: um pouco mais claro que os títulos. A hierarquia também
+     é cor, não só tamanho. Especificidade zero de propósito, para .fraco e
+     .miudo continuarem vencendo. */
+  :where(#vista, .rodape-interno) :is(p, li, dd) { color: var(--tinta-2); }
+  :where(#vista) :is(p, ul, ol, dl) { max-width: var(--medida); }
+
+  /* Corpo do parágrafo respira mais do que a lista de leitura rápida. */
+  :where(#vista) p { line-height: 1.6; }
+  :where(#vista) li + li { margin-top: var(--e-2); }
+}
+
+@layer layout {
+  /* ESPAÇO ACIMA é o recurso mais barato de hierarquia e o menos usado aqui.
+     Cada seção nova abre com filete e ar, em vez de mais um cartão. Isto
+     também é o que substitui o rótulo em caixa alta que havia em cada bloco. */
+  #vista section > h2:first-child {
+    padding-top: var(--e-5);
+    border-top: 1px solid var(--linha);
+  }
+  #vista > * > section:first-child > h2:first-child,
+  #vista .cartao > h2:first-child {
+    padding-top: 0;
+    border-top: 0;
+  }
+  #vista h3 { margin-top: var(--e-5); }
+  #vista :is(h3:first-child, .cartao-titulo, .anat-explica h4) { margin-top: 0; }
+
+  /* Distância entre seções de primeiro nível. Sem isto, seção e subseção
+     ficam à mesma distância e a página vira uma pilha uniforme. */
+  @media (min-width: 48rem) {
+    #vista .empilha-g > * + * { margin-top: var(--e-7); }
+  }
+}
+
+@layer componentes {
+  /* Título de cartão alinhado ao novo h3: o cartão é um agrupamento, não um
+     nível hierárquico próprio. */
+  .cartao-titulo {
+    font-family: var(--ff-titulo);
+    font-size: var(--t-1);
+    font-weight: 660;
+    letter-spacing: -0.012em;
+    line-height: 1.28;
+  }
+  .cartao-sub {
+    font-size: var(--t--1);
+    line-height: 1.55;
+    color: var(--tinta-3);
+    max-width: 48ch;
+  }
+
+  /* DEFEITO: rótulo em caixa alta espaçada usado como único recurso de
+     hierarquia, repetidamente. Agora que a tipografia carrega a hierarquia,
+     a etiqueta volta a ser o que é: um dado de contexto, discreto. O traço
+     vermelho antes dela sai; sobra um filete neutro. */
+  .etiqueta {
+    color: var(--tinta-3);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: none;
+  }
+  .etiqueta::before { background: var(--linha-2); }
+
+  /* Chave do laudo continua em caixa alta de propósito: ali ela é rótulo de
+     campo de laudo impresso, convenção de documento clínico, e não rótulo de
+     seção. Só o espacejamento cai, que estava largo demais para ler. */
+  .laudo-chave { letter-spacing: 0.04em; }
+
+  /* DEFEITO: cartão dentro de cartão. Onde acontecer, o interno perde a
+     casca e vira agrupamento por filete. */
+  .cartao .cartao {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+    padding-top: var(--e-4);
+    border-top: 1px solid var(--linha);
+  }
+  .cartao .cartao:first-child { border-top: 0; padding-top: 0; }
+}
+
+/* ==========================================================================
+   BLOCO 3 . NÚMEROS EM MONO TABULAR
+   DEFEITO: números de medida saindo em fonte proporcional, e os números
+   grandes do painel de desempenho na fonte de título. Medida que muda de
+   largura enquanto o aluno arrasta o controle dá impressão de instabilidade
+   e atrapalha comparar duas linhas do laudo.
+   ========================================================================== */
+@layer refino {
+  .progresso-texto,
+  .quad-tabela td,
+  .monitor-fc,
+  .ecg-calib-texto,
+  .divergencia,
+  .paq-marcador,
+  time {
+    font-variant-numeric: tabular-nums;
+  }
+  .laudo-valor, .ctrl-valor, output { letter-spacing: -0.005em; }
+}
+
+/* Painel de desempenho: os quatro números grandes chegam com font-family
+   embutida no atributo style pelo app.js, e atributo style vence qualquer
+   camada. Este é o único !important do arquivo, e ele cai no dia em que o
+   markup trocar o style inline por uma classe (ver "avisos"). */
+#vista .cartao.centro > div:first-child {
+  font-family: var(--ff-mono) !important;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+#vista .cartao.centro .etiqueta { display: block; margin-top: var(--e-2); }
+#vista .cartao.centro .etiqueta::before { content: none; }
+
+/* ==========================================================================
+   BLOCO 4 . MOBILE 375 px PRIMEIRO, DEPOIS iPad
+   DEFEITO: densidade pensada em tela larga. A 375 px sobravam 295 px úteis
+   dentro de um cartão de 24 px de padding, a barra de abas cortava a pílula
+   preta do meio (parecia quebrada), o resumo do sumário não tinha alvo de
+   toque e a tabela de quadrantes empurrava a página para o lado.
+   ========================================================================== */
+@layer layout {
+  /* Recorte de tela com entalhe: viewport-fit=cover já está no index.html,
+     faltava usar a área segura. */
+  .topo-interno, .abas, .conteudo, .rodape {
+    padding-left: max(var(--goteira), env(safe-area-inset-left));
+    padding-right: max(var(--goteira), env(safe-area-inset-right));
+  }
+
+  /* --- barra de abas: rolar sem parecer quebrada ---
+     1. a aba ativa deixa de ser pílula preta (metade de uma pílula cortada
+        pela borda é o que dava aspecto de quebrado) e vira sublinhado de
+        indicador, que tolera corte;
+     2. a aba passa a ocupar a altura inteira da faixa, então o indicador
+        encosta no filete inferior, como aba de verdade;
+     3. scroll-snap alinha a aba ao parar o dedo;
+     4. sobra de rolagem no fim, para a última aba nunca colar na borda. */
+  .abas {
+    padding-block: 0;
+    padding-right: calc(max(var(--goteira), env(safe-area-inset-right)) + var(--e-5));
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: var(--goteira);
+    align-items: stretch;
+  }
+  .aba {
+    display: inline-flex;
+    align-items: center;
+    min-height: 48px;
+    padding: 0 var(--e-3);
+    border-radius: 0;
+    scroll-snap-align: center;
+    box-shadow: inset 0 -2px 0 0 transparent;
+    transition: color var(--transicao), box-shadow var(--transicao);
+  }
+  .aba:hover { background: transparent; color: var(--tinta); }
+  .aba[aria-selected="true"] {
+    background: transparent;
+    color: var(--tinta);
+    box-shadow: inset 0 -2px 0 0 var(--acento);
+  }
+  /* o anel de foco precisa caber dentro do contêiner que rola */
+  .aba:focus-visible { outline-offset: -3px; }
+
+  /* Véu no fim da faixa de abas: diz "tem mais coisa para o lado" sem
+     depender de barra de rolagem, que o celular esconde. Fica sobre a sobra
+     de rolagem criada acima, nunca sobre o texto de uma aba. */
+  .topo::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 1px;
+    width: 2.5rem;
+    height: 48px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, var(--papel-2) 78%);
+  }
+  @media (min-width: 64rem) { .topo::after { content: none; } }
+}
+
+@layer refino {
+  /* Guarda de rolagem horizontal: filho de grade ou de flex com conteúdo
+     largo (traçado, tabela, laudo) só respeita a coluna se puder encolher. */
+  .linha > *, .grade-auto > *, .anat-grade > *, .eixo-palco > * { min-width: 0; }
+  #vista :is(table, pre) { max-width: 100%; }
+
+  /* DEFEITO com consequência clínica, não só estética. O reset aplica
+     max-width:100% a todo svg. A 375 px, uma tira de 5 s ocupa cerca de
+     405 px e era ESPREMIDA para 343 px: o milímetro deixava de ser
+     milímetro, o traçado saía com 15% a menos na horizontal e os marcadores
+     do paquímetro, que são posicionados em px calculados a partir de --mm,
+     paravam de cair sobre o ponto que estavam medindo.
+
+     Dentro de um .ecg-scroller a tira volta à largura intrínseca e rola
+     dentro de si, que é o comportamento previsto no app.css. A página
+     continua sem rolagem horizontal: quem rola é o scroller, e o body
+     mantém overflow-x hidden. */
+  .ecg-scroller svg { max-width: none; }
+
+  /* Os dois palcos que recebem elementos posicionados por cima do traçado
+     (marcadores do paquímetro, holofote e varredura da leitura guiada)
+     passam a ter a largura da tira, e não a da janela. Sem isto a régua de
+     percentuais do holofote apontaria para um lugar e o traçado estaria em
+     outro, exatamente o erro que o holofote existe para evitar. */
+  .paq-palco, .ecg-palco { width: max-content; min-width: 100%; }
+}
+
+@media (max-width: 30rem) {
+  @layer layout {
+    .conteudo { padding-block: var(--e-4) var(--e-7); }
+    #vista .empilha-g > * + * { margin-top: var(--e-6); }
+    #vista section > h2:first-child { padding-top: var(--e-4); }
+    /* .topo na frente porque o bloco do logo, mais abaixo neste arquivo,
+       redefine .marca-nome na mesma camada e venceria por ordem de origem. */
+    .topo .marca-nome { font-size: var(--t-0); }
+
+    /* DEFEITO: a 375 px o nome do site era desenhado POR CIMA da barra de
+       progresso. A barra tem doze segmentos de 14 px mais o contador, cerca de
+       237 px, e sobrava menos que isso para o lockup; como .marca-nome é
+       nowrap, ele transbordava a própria caixa em vez de encolher.
+
+       Os doze segmentos já são decorativos (o index.html os marca com
+       aria-hidden). No celular eles saem e fica o contador, que é o dado. O
+       corte com reticências é só cinto de segurança: com a barra fora, o nome
+       inteiro cabe.
+
+       A regra que apaga os segmentos está no bloco `componentes` logo abaixo,
+       e não aqui: `.progresso` é declarada naquela camada no app.css, e
+       `componentes` vem DEPOIS de `layout` na ordem de camadas. Aqui ela
+       perderia por camada, por mais específica que fosse. */
+    .topo .marca { flex: 0 1 auto; overflow: hidden; }
+    .topo .marca-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  }
+  @layer componentes {
+    /* Os doze segmentos do cabeçalho saem no celular. Ver a justificativa
+       completa no bloco `layout` acima. */
+    .topo-progresso .progresso { display: none; }
+
+    /* 24 px de padding de cada lado consumiam 13% da tela. */
+    .cartao { padding: var(--e-4); border-radius: var(--r-3); }
+    .nota { padding-left: var(--e-3); }
+    .cartao-sub, .nota { max-width: none; }
+  }
+  @layer base {
+    h1 { letter-spacing: -0.03em; }
+    h1 + p { font-size: var(--t-1); max-width: none; }
+    h2 + p { max-width: none; }
+  }
+  @layer ferramentas {
+    /* quatro colunas em 343 px úteis: cabe, desde que a célula seja apertada */
+    .quad-tabela { font-size: var(--t--2); table-layout: fixed; width: 100%; }
+    .quad-tabela :is(th, td) { padding: var(--e-1) var(--e-2); }
+    .quad-tabela :is(th, td):nth-child(-n+2) { width: 3.2rem; }
+  }
+}
+
+/* Alvo de toque de 44 px em tudo que se toca, inclusive no sumário
+   dobrável dos nove passos, que era só uma linha de texto. */
+@media (pointer: coarse) {
+  @layer refino {
+    .aba, .btn, .anat-botao, .monitor-btn, summary, select, .paq-marcador {
+      min-height: var(--toque);
+    }
+  }
+}
+
+@layer componentes {
+  details > summary {
+    display: flex;
+    align-items: center;
+    gap: var(--e-3);
+    min-height: var(--toque);
+    list-style: none;
+    line-height: 1.35;
+  }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::after {
+    content: "+";
+    margin-left: auto;
+    font-family: var(--ff-mono);
+    font-size: var(--t-1);
+    font-weight: 400;
+    color: var(--tinta-3);
+    line-height: 1;
+  }
+  details[open] > summary::after { content: "\2212"; }
+  details[open] > summary { color: var(--acento); }
+}
+
+/* iPad. Retrato 768 e paisagem 1024: a página deixa de ser um celular
+   esticado. Goteira maior, grade em duas colunas de verdade e medida de
+   leitura preservada. */
+@media (min-width: 48rem) and (max-width: 64rem) {
+  @layer layout {
+    .conteudo { padding-inline: var(--e-6); padding-block: var(--e-6) var(--e-8); }
+    .grade-auto { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-5); }
+  }
+  @layer componentes {
+    .cartao { padding: var(--e-5); }
+  }
+}
+@media (min-width: 64rem) {
+  @layer layout {
+    .grade-auto { gap: var(--e-5); }
+  }
+}
+
+/* ==========================================================================
+   BLOCO 5 . LOGO
+   DEFEITO: retângulo vermelho com um traçado branco dentro, ao lado do nome.
+   Caixa colorida em cabeçalho fixo é a coisa mais parecida com "logo de
+   template" que existe, e a 24 px o traço dentro da caixa some.
+
+   CORREÇÃO: o mark passa a ser UM traço de ECG, sem fundo, herdando a cor
+   por currentColor (bordô clínico no cabeçalho, tinta em contexto neutro).
+   O desenho tem quatro eventos reconhecíveis: linha de base, onda P
+   arredondada, QRS com q, R alta e volta, e onda T em cúpula. Em 24 px de
+   altura sobram o R e a cúpula da T, que é o que precisa sobrar.
+
+   COLE ISTO NO index.html, no lugar do <svg> atual dentro de <div class="marca">:
+
+   <svg class="marca-mark" viewBox="0 0 44 24" height="22" role="img"
+        aria-label="ECG Ultimate Learning" focusable="false">
+     <path d="M2 15h9.4q2.5-4 5 0h2.4l1.2 3L23.8 4L26 15h3c1.6 0 2.2-5.6 4.4-5.6s2.8 5.6 4.4 5.6H42"
+           fill="none" stroke="currentColor" stroke-width="2.2"
+           stroke-linecap="round" stroke-linejoin="round"/>
+   </svg>
+
+   E o favicon equivalente, sem a caixa vermelha, no <link rel="icon">:
+
+   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 24'%3E%3Cpath d='M2 15h9.4q2.5-4 5 0h2.4l1.2 3L23.8 4L26 15h3c1.6 0 2.2-5.6 4.4-5.6s2.8 5.6 4.4 5.6H42' fill='none' stroke='%23c2352b' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+   ========================================================================== */
+@layer layout {
+  .marca { gap: var(--e-3); align-items: center; }
+
+  .marca-mark {
+    flex: 0 0 auto;
+    height: 22px;
+    width: auto;
+    color: var(--acento);
+    overflow: visible;
+  }
+  @media (min-width: 48rem) { .marca-mark { height: 26px; } }
+
+  /* Lockup: o nome encosta mais no mark e ganha o peso que o mark não tem.
+     O antigo retângulo competia com o nome; o traço apoia o nome. */
+  .marca-nome {
+    font-family: var(--ff-titulo);
+    font-size: var(--t-1);
+    font-weight: 640;
+    letter-spacing: -0.022em;
+    line-height: 1.15;
+    color: var(--tinta);
+  }
+  /* Uma caixa alta espaçada a menos no cabeçalho. */
+  .marca-sub {
+    font-family: var(--ff-corpo);
+    font-size: var(--t--2);
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--tinta-3);
+    line-height: 1.3;
+  }
+
+  /* Enquanto o index.html ainda não tiver a classe .marca-mark, o SVG antigo
+     continua funcionando: esta regra só alcança o SVG direto da marca e
+     apenas ajusta o tamanho, sem tentar consertar o retângulo. */
+  .marca > svg:not(.marca-mark) { height: 24px; width: auto; }
+}
+
+/* ==========================================================================
+   BLOCO 6 . ACABAMENTO
+   Ajustes menores que vêm dos mesmos defeitos: superfície sem função,
+   sombra genérica e filetes fracos demais para agrupar sozinhos.
+   ========================================================================== */
+@layer componentes {
+  .cartao {
+    border-color: var(--linha);
+    box-shadow: none;               /* sombra de cartão genérico não agrupa nada */
+    background: var(--superficie);
+  }
+  .cartao--calmo { border-color: var(--linha); background: var(--papel-2); }
+
+  /* Cartão clicável (padrões, casos, revisão): precisa de resposta ao toque,
+     não de sombra parada. */
+  button.cartao { transition: border-color var(--transicao), background var(--transicao); }
+  button.cartao:hover { border-color: var(--linha-forte); background: var(--superficie-2); }
+  button.cartao:active { background: var(--papel-2); }
+
+  .bloco { padding-block: var(--e-7); }
+  .bloco:first-child { padding-top: 0; }
+}
+
+@layer ecg {
+  /* Tira dentro de cartão: um raio de canto menor que o do cartão, para não
+     parecer um segundo cartão embutido. */
+  .cartao .ecg-tira { border-radius: var(--r-2); }
+  .ecg-cabeca, .ecg-pe { letter-spacing: 0.02em; }
+}
+
+/* O rodapé mora na camada layout no app.css: a correção precisa entrar na
+   mesma camada, senão layout venceria de volta. */
+@layer layout {
+  /* O rodapé já declara que os traçados são sintéticos. Este é o único lugar
+     do site onde esse aviso aparece, e ele fica legível: prosa corrida, sem
+     caixa colorida em volta. */
+  .rodape { font-size: var(--t--1); line-height: 1.62; }
+  .rodape strong { color: var(--tinta-2); }
+  .rodape .prosa { max-width: 62ch; }
+}
