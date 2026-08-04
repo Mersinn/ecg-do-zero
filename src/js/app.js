@@ -9,6 +9,7 @@
 import { PADROES, FAMILIAS, PASSOS, montarRitmo, listarPadroes } from './ecg/library.js';
 import { renderizarTira } from './ecg/engine.js';
 import { criarGerador, criarEixo, criarPaquimetro } from './tools.js';
+import { criarAnatomia } from './anatomy.js';
 import * as store from './store.js';
 
 /* Conteúdo produzido separadamente. Carregado sob demanda para que o app
@@ -68,6 +69,41 @@ function tira(chave, { estilo = 'papel', altura = 40 } = {}) {
   </div>`;
 }
 
+/**
+ * Tira do modo "Observe": ondas coloridas com rótulo, traço que se desenha e
+ * holofote que caminha até o achado sendo explicado.
+ *
+ * As três coisas juntas são o que separa "ver um rabisco" de "ver P, QRS e T".
+ * Sem o holofote, o aluno lê "olhe o intervalo PR" e não sabe onde é o PR.
+ */
+function tiraGuiada(chave) {
+  const p = PADROES[chave];
+  const ritmo = montarRitmo(chave);
+  const svg = renderizarTira(ritmo, {
+    estilo: 'monitor', mmPx: mmPx(), derivacao: p.derivacao, id: `g-${chave}`,
+    segmentado: true, rotularOndas: true, animar: true,
+  });
+  return `<div class="ecg-tira" data-tira-guiada data-duracao="${ritmo.duracao}">
+    <div class="ecg-cabeca">
+      <span><span class="ecg-pulso"></span>${esc(p.nome)} · ${esc(p.derivacao)}</span>
+      <span class="ecg-calib-texto">25 mm/s · 10 mm/mV</span>
+    </div>
+    <div class="ecg-scroller" tabindex="0" role="group" aria-label="Traçado de ${esc(p.nome)}, com as ondas em cores. Role para ver a tira inteira.">
+      <div class="ecg-palco" data-palco-guiado>
+        ${svg}
+        <div class="ecg-varredura" aria-hidden="true"></div>
+        <div class="ecg-holofote" data-holofote hidden></div>
+        <div class="ecg-holofote-rotulo" data-holofote-rotulo hidden>olhe aqui</div>
+      </div>
+    </div>
+    <div class="ecg-pe">
+      <span style="color:var(--mon-p)">P · átrios</span>
+      <span style="color:var(--mon-qrs)">QRS · ventrículos</span>
+      <span style="color:var(--mon-t)">T · repolarização</span>
+    </div>
+  </div>`;
+}
+
 /* ==========================================================================
    TELAS
    ========================================================================== */
@@ -75,6 +111,7 @@ function tira(chave, { estilo = 'papel', altura = 40 } = {}) {
 const TELAS = [
   { id: 'metodo',     rotulo: 'Método' },
   { id: 'papel',      rotulo: 'O papel' },
+  { id: 'anatomia',   rotulo: 'Anatomia' },
   { id: 'modulos',    rotulo: 'Módulos' },
   { id: 'bancada',    rotulo: 'Bancada' },
   { id: 'plantao',    rotulo: 'Plantão' },
@@ -180,6 +217,31 @@ function telaPapel() {
       ${tira('normal')}
     </section>
 
+    <section class="cartao empilha" id="regua-papel">
+      <div>
+        <h3 class="cartao-titulo">Régua do papel</h3>
+        <p class="cartao-sub">Conte quadradões entre dois R e veja a frequência sair da conta. É
+        assim que se calcula frequência sem calculadora, e é assim que cai na prova.</p>
+      </div>
+      <div class="ecg-tira">
+        <div class="ecg-scroller"><div data-regua-palco></div></div>
+      </div>
+      <div data-regua-ctrl></div>
+      <div class="laudo">
+        <div class="laudo-linha"><span class="laudo-chave">Tempo</span><span class="laudo-valor mono" data-regua-tempo></span></div>
+        <div class="laudo-linha"><span class="laudo-chave">Frequência</span><span class="laudo-valor" data-regua-fc></span></div>
+        <div class="laudo-linha"><span class="laudo-chave">A conta</span><span class="laudo-valor mono" data-regua-conta></span></div>
+      </div>
+      <div class="nota nota--atencao">
+        <div class="nota-titulo">A régua dos múltiplos de 300</div>
+        Se o segundo R cai exatamente sobre uma linha grossa, a frequência é
+        <strong>300, 150, 100, 75, 60, 50</strong> — uma para cada quadradão. Decorar essa sequência
+        resolve a maioria dos traçados regulares em dois segundos. <strong>Nenhuma das duas contas
+        vale em ritmo irregular</strong>: em fibrilação atrial, conte os QRS em 6 segundos e
+        multiplique por 10.
+      </div>
+    </section>
+
     <div class="nota nota--info">
       <div class="nota-titulo">Quando a calibração muda</div>
       Metade do ganho (5 mm/mV) é usada quando o complexo é tão alto que sai do papel, como em
@@ -188,6 +250,82 @@ function telaPapel() {
       diagnosticar sobrecarga onde não há, ou deixar de ver a que existe.
     </div>
   </div>`;
+}
+
+/**
+ * Régua do papel: o aluno varia o número de quadradões entre dois R e vê a
+ * frequência sair da divisão. Ensinar a conta mostrando a conta acontecer é
+ * mais eficaz que enunciá-la.
+ */
+function ligarRegua(raiz) {
+  const palco = raiz.querySelector('[data-regua-palco]');
+  const ctrl = raiz.querySelector('[data-regua-ctrl]');
+  if (!palco) return;
+
+  let quadradoes = 4;
+
+  function desenhar() {
+    const mm = mmPx();
+    const larguraMm = 60;
+    const alturaMm = 30;
+    const w = larguraMm * mm;
+    const h = alturaMm * mm;
+    const base = h * 0.68;
+    const p1 = mm;
+    const p5 = mm * 5;
+    const x1 = mm * 6;
+    const x2 = x1 + quadradoes * p5;
+
+    const rPico = (x) =>
+      `M${x - p1 * 2} ${base} L${x - p1} ${base + p1 * 1.6} L${x} ${base - p1 * 9} L${x + p1} ${base + p1 * 2} L${x + p1 * 2} ${base}`;
+
+    palco.innerHTML = `<svg class="ecg-svg ecg-papel" viewBox="0 0 ${w.toFixed(0)} ${h.toFixed(0)}" width="${w.toFixed(0)}" height="${h.toFixed(0)}" role="img" aria-label="Grade de papel de ECG com dois complexos separados por ${quadradoes} quadradões">
+      <defs><pattern id="regua-g" width="${p5}" height="${p5}" patternUnits="userSpaceOnUse">
+        <path class="ecg-grade-1" d="M0 0H${p5}M0 ${p1}H${p5}M0 ${p1 * 2}H${p5}M0 ${p1 * 3}H${p5}M0 ${p1 * 4}H${p5}M0 0V${p5}M${p1} 0V${p5}M${p1 * 2} 0V${p5}M${p1 * 3} 0V${p5}M${p1 * 4} 0V${p5}"/>
+        <path class="ecg-grade-5" d="M0 0H${p5}M0 0V${p5}"/>
+      </pattern></defs>
+      <rect class="ecg-fundo" width="${w}" height="${h}"/>
+      <rect width="${w}" height="${h}" fill="url(#regua-g)"/>
+      <line x1="0" y1="${base}" x2="${w}" y2="${base}" class="ecg-traco" opacity="0.25"/>
+      <path class="ecg-traco ecg-onda-qrs" d="${rPico(x1)}"/>
+      <path class="ecg-traco ecg-onda-qrs" d="${rPico(x2)}"/>
+      <line x1="${x1}" y1="${base - p1 * 11}" x2="${x2}" y2="${base - p1 * 11}" stroke="var(--acento)" stroke-width="1.5"/>
+      <line x1="${x1}" y1="${base - p1 * 13}" x2="${x1}" y2="${base - p1 * 9}" stroke="var(--acento)" stroke-width="1.5"/>
+      <line x1="${x2}" y1="${base - p1 * 13}" x2="${x2}" y2="${base - p1 * 9}" stroke="var(--acento)" stroke-width="1.5"/>
+      <text x="${(x1 + x2) / 2}" y="${base - p1 * 13}" text-anchor="middle" fill="var(--acento)" font-family="var(--ff-mono)" font-size="11" font-weight="700">R–R</text>
+      <rect x="${mm}" y="${base + p1 * 3}" width="${p1}" height="${p1}" fill="none" stroke="var(--info)" stroke-width="1.2"/>
+      <text x="${mm + p1 * 1.6}" y="${base + p1 * 4}" fill="var(--info)" font-family="var(--ff-mono)" font-size="9">1 quadradinho = 0,04 s</text>
+      <rect x="${mm}" y="${base + p1 * 5.5}" width="${p5}" height="${p5}" fill="none" stroke="var(--acento)" stroke-width="1.2"/>
+      <text x="${mm + p5 + p1}" y="${base + p1 * 8}" fill="var(--acento)" font-family="var(--ff-mono)" font-size="9">1 quadradão = 0,20 s</text>
+    </svg>`;
+
+    const ms = quadradoes * 200;
+    const fc = Math.round(300 / quadradoes);
+    raiz.querySelector('[data-regua-tempo]').textContent =
+      `${quadradoes} quadradões = ${quadradoes * 5} quadradinhos = ${(ms / 1000).toFixed(2).replace('.', ',')} s`;
+    const elFc = raiz.querySelector('[data-regua-fc]');
+    elFc.textContent = `${fc} bpm${fc < 60 ? ' — bradicardia' : fc > 100 ? ' — taquicardia' : ' — dentro do normal'}`;
+    elFc.dataset.status = fc < 60 || fc > 100 ? 'alterado' : 'normal';
+    raiz.querySelector('[data-regua-conta]').textContent =
+      `300 ÷ ${quadradoes} = ${fc}   ·   1500 ÷ ${quadradoes * 5} = ${fc}`;
+  }
+
+  ctrl.innerHTML = `<div class="ctrl">
+    <label class="ctrl-nome" for="regua-q">Quadradões entre dois R</label>
+    <div class="ctrl-trilho-area"><input id="regua-q" class="trilho" type="range" min="1" max="10" step="1" value="4"></div>
+    <output class="ctrl-valor" data-regua-out>4</output>
+  </div>`;
+
+  const input = ctrl.querySelector('#regua-q');
+  const out = ctrl.querySelector('[data-regua-out]');
+  const sincronizar = () => {
+    quadradoes = Number(input.value);
+    out.textContent = quadradoes;
+    input.style.setProperty('--preenchido', `${((quadradoes - 1) / 9) * 100}%`);
+    desenhar();
+  };
+  input.addEventListener('input', sincronizar);
+  sincronizar();
 }
 
 /* -------------------------------------------------------------- MÓDULOS -- */
@@ -215,6 +353,7 @@ function telaModulos() {
       <section class="empilha">
         <h2>${esc(meta.nome)}</h2>
         ${modulo?.promessa ? `<p class="prosa fraco">${esc(modulo.promessa)}</p>` : ''}
+        ${modulo ? `<button class="btn btn--contorno btn--pequeno" data-aula="${fam}" type="button">Ler a aula deste tema</button>` : ''}
         <div class="grade-auto">
           ${lista.map((p) => {
             const prog = store.progressoPadrao(p.chave);
@@ -235,6 +374,87 @@ function telaModulos() {
   </div>`;
 }
 
+/**
+ * Aula da família: a fisiopatologia contada de forma que o padrão do traçado
+ * passe a ser CONSEQUÊNCIA, não coisa a decorar. É a diferença entre saber que
+ * o PR alonga no Wenckebach e entender por que o nó AV faz isso.
+ */
+function telaAula(familia) {
+  const m = (LICOES.MODULOS || []).find((x) => x.familia === familia);
+  if (!m) return '<div class="nota nota--info">Aula deste tema ainda não disponível.</div>';
+
+  const padroes = (m.ordemSugerida || []).filter((k) => PADROES[k]);
+
+  return `
+  <div class="empilha-g">
+    <button class="btn btn--fantasma btn--pequeno" data-voltar>← Voltar aos módulos</button>
+
+    <section class="prosa empilha">
+      <span class="etiqueta">${esc(FAMILIAS[familia]?.nome || '')}</span>
+      <h1>${esc(m.titulo)}</h1>
+      <div class="nota nota--ok">
+        <div class="nota-titulo">Ao final desta aula você consegue</div>
+        ${esc(m.promessa)}
+      </div>
+    </section>
+
+    <section class="prosa empilha">
+      <h2>Por que isto importa</h2>
+      <p>${esc(m.porQueImporta)}</p>
+    </section>
+
+    <section class="prosa empilha">
+      <h2>O mecanismo</h2>
+      ${String(m.fisiopatologia).split(/\n\s*\n/).map((par) => `<p>${esc(par.trim())}</p>`).join('')}
+    </section>
+
+    <section class="cartao empilha">
+      <h3 class="cartao-titulo">Onde olhar primeiro, neste tema</h3>
+      <p>${esc(m.comoLer)}</p>
+    </section>
+
+    ${Array.isArray(m.ancoras) && m.ancoras.length ? `
+    <section class="empilha">
+      <h2>Frases-âncora</h2>
+      <p class="prosa fraco">São estas que você quer conseguir recuperar na hora da prova.</p>
+      <div class="empilha">
+        ${m.ancoras.map((a) => `<div class="nota nota--info">${esc(a)}</div>`).join('')}
+      </div>
+    </section>` : ''}
+
+    ${Array.isArray(m.errosComuns) && m.errosComuns.length ? `
+    <section class="empilha">
+      <h2>Erros que derrubam a maioria</h2>
+      <div class="empilha">
+        ${m.errosComuns.map((e) => `
+          <div class="cartao cartao--calmo empilha">
+            <h4 style="color:var(--perigo)">${esc(e.erro)}</h4>
+            <p><strong>Por que acontece:</strong> ${esc(e.porQue)}</p>
+            <p><strong>Como evitar:</strong> ${esc(e.comoEvitar)}</p>
+          </div>`).join('')}
+      </div>
+    </section>` : ''}
+
+    ${padroes.length ? `
+    <section class="empilha">
+      <h2>Agora os traçados, nesta ordem</h2>
+      <div class="grade-auto">
+        ${padroes.map((k, i) => {
+          const p = PADROES[k];
+          const prog = store.progressoPadrao(k);
+          return `<button class="cartao" data-padrao="${k}" style="text-align:left;cursor:pointer">
+            <div class="linha" style="justify-content:space-between;align-items:flex-start">
+              <h3 class="cartao-titulo" style="font-size:var(--t-1)">${i + 1}. ${esc(p.nome)}</h3>
+              ${prog.estado === 'solido' ? '<span class="divergencia" style="background:var(--ok-fraco);color:var(--ok);border-color:var(--ok-borda)">dominado</span>' : ''}
+            </div>
+            <p class="cartao-sub">${esc(p.pivo)}</p>
+          </button>`;
+        }).join('')}
+      </div>
+    </section>` : ''}
+  </div>`;
+}
+
 /* ------------------------------------------------------- ESTUDO DE UM PADRÃO */
 
 function telaPadrao(chave) {
@@ -252,7 +472,9 @@ function telaPadrao(chave) {
 
     <section class="empilha">
       <h2>1. Observe</h2>
-      ${tira(chave, { estilo: 'monitor' })}
+      <p class="prosa fraco">Cada onda tem cor e nome. Acompanhe o guia: a faixa se move at&eacute; o
+      achado que est&aacute; sendo explicado, para voc&ecirc; nunca ficar procurando onde olhar.</p>
+      ${tiraGuiada(chave)}
       ${roteiro.length ? `
       <div class="cartao empilha" data-roteiro>
         <div class="progresso" data-roteiro-prog></div>
@@ -303,11 +525,35 @@ function ligarTelaPadrao(raiz, chave) {
     const x = raiz.querySelector('[data-roteiro-texto]');
     const c = raiz.querySelector('[data-roteiro-conta]');
     const g = raiz.querySelector('[data-roteiro-prog]');
+    const tiraEl = raiz.querySelector('[data-tira-guiada]');
+    const holo = raiz.querySelector('[data-holofote]');
+    const holoRot = raiz.querySelector('[data-holofote-rotulo]');
+    const duracao = Number(tiraEl?.dataset.duracao || 0);
+    const svgEl = raiz.querySelector('[data-palco-guiado] svg');
+
+    /** Move a faixa de destaque até o instante tMs do traçado. */
+    const holofote = (tMs, rotulo) => {
+      if (!holo || !svgEl || !duracao) return;
+      if (tMs == null) { holo.hidden = true; holoRot.hidden = true; return; }
+      const largura = svgEl.viewBox.baseVal.width || svgEl.clientWidth;
+      // O traçado começa depois da margem do pulso de calibração.
+      const inicio = 10 / (largura / svgEl.clientWidth || 1);
+      const fracao = Math.max(0, Math.min(1, (tMs / duracao) * 0.9 + 0.06));
+      const larguraFaixa = 0.14;
+      holo.hidden = false; holoRot.hidden = false;
+      holo.style.left = `${Math.max(0, Math.min(1 - larguraFaixa, fracao - larguraFaixa / 2)) * 100}%`;
+      holo.style.width = `${larguraFaixa * 100}%`;
+      holoRot.style.left = `${Math.max(8, Math.min(92, fracao * 100))}%`;
+      holoRot.textContent = rotulo || 'olhe aqui';
+      void inicio;
+    };
+
     const pintar = () => {
       const passo = roteiro[i];
       t.textContent = passo.titulo || '';
       x.innerHTML = passo.texto || '';
       c.textContent = `${i + 1} / ${roteiro.length}`;
+      holofote(passo.tMs ?? passo.t ?? null, passo.foco);
       g.innerHTML = roteiro.map((_, k) => `<span class="progresso-seg" data-estado="${k <= i ? 'solido' : ''}"></span>`).join('');
       raiz.querySelector('[data-roteiro-ant]').disabled = i === 0;
       raiz.querySelector('[data-roteiro-prox]').disabled = i === roteiro.length - 1;
@@ -523,9 +769,118 @@ function telaQuestoes() {
       <h1>Questões</h1>
       <p>Comentadas item a item: por que a correta está correta e por que cada errada seduz.</p>
     </section>
+    <div class="linha">
+      <button class="btn btn--principal" data-sortear type="button">Sortear questão</button>
+      <select class="btn btn--contorno" data-filtro aria-label="Filtrar por tema">
+        <option value="">Todos os temas</option>
+        ${Object.entries(FAMILIAS).sort((a, b) => a[1].ordem - b[1].ordem)
+          .map(([k, v]) => `<option value="${k}">${esc(v.nome)}</option>`).join('')}
+      </select>
+    </div>
     <div id="questao-atual"></div>
-    <button class="btn btn--principal" data-sortear type="button">Sortear questão</button>
   </div>`;
+}
+
+function ligarQuestoes(raiz) {
+  const alvo = raiz.querySelector('#questao-atual');
+  const filtro = raiz.querySelector('[data-filtro]');
+  if (!alvo) return;
+
+  let atual = null;
+  let respondida = false;
+
+  function sortear() {
+    const pool = filtro.value ? QUESTOES.filter((q) => q.familia === filtro.value) : QUESTOES;
+    if (!pool.length) {
+      alvo.innerHTML = '<div class="nota nota--info">Ainda não há questões deste tema.</div>';
+      return;
+    }
+    atual = pool[Math.floor(Math.random() * pool.length)];
+    respondida = false;
+
+    alvo.innerHTML = `
+      <div class="cartao empilha">
+        <div class="linha">
+          <span class="etiqueta">${esc(FAMILIAS[atual.familia]?.nome || '')}</span>
+          ${atual.comandoInvertido ? '<span class="divergencia">comando invertido</span>' : ''}
+        </div>
+        <p>${esc(atual.enunciado)}</p>
+        <div class="empilha" data-alts>
+          ${atual.alternativas.map((a, i) =>
+            `<button class="btn btn--contorno cheio" data-alt="${i}" style="justify-content:flex-start;text-align:left;height:auto;padding-block:var(--e-3)">
+              <strong style="margin-right:var(--e-2)">${String.fromCharCode(65 + i)}</strong> ${esc(a)}
+            </button>`).join('')}
+        </div>
+        <div data-freio></div>
+        <div data-correcao></div>
+      </div>`;
+
+    alvo.querySelector('[data-alts]').addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-alt]');
+      if (b && !respondida) freio(Number(b.dataset.alt));
+    });
+  }
+
+  /* O Freio: antes de abrir o gabarito, o aluno nomeia o que a questão pede. */
+  function freio(escolha) {
+    respondida = true;
+    for (const b of alvo.querySelectorAll('[data-alt]')) b.disabled = true;
+
+    alvo.querySelector('[data-freio]').innerHTML = `
+      <div class="nota nota--atencao">
+        <div class="nota-titulo">Freio — antes de abrir</div>
+        <p>Você marcou <strong>${String.fromCharCode(65 + escolha)}</strong>. Em uma linha:
+        <strong>o que esta questão está de fato pedindo?</strong> O que ela mede — não a história
+        que ela contou.</p>
+        <textarea data-freio-texto rows="2" style="width:100%;margin-top:var(--e-2);padding:var(--e-2);border:1px solid var(--linha-2);border-radius:var(--r-2);font:inherit" placeholder="o que ela pede de verdade é..."></textarea>
+        <button class="btn btn--principal btn--pequeno" data-abrir type="button" style="margin-top:var(--e-2)">Abrir correção</button>
+      </div>`;
+
+    alvo.querySelector('[data-abrir]').addEventListener('click', () => corrigir(escolha));
+  }
+
+  function corrigir(escolha) {
+    const texto = (alvo.querySelector('[data-freio-texto]')?.value || '').trim();
+    const acertou = escolha === atual.correta;
+    store.registrarQuestao(atual.id, acertou);
+
+    for (const b of alvo.querySelectorAll('[data-alt]')) {
+      const i = Number(b.dataset.alt);
+      if (i === atual.correta) b.style.borderColor = 'var(--ok)';
+      else if (i === escolha) b.style.borderColor = 'var(--perigo)';
+      else b.style.opacity = '0.5';
+    }
+
+    alvo.querySelector('[data-freio]').innerHTML = '';
+    alvo.querySelector('[data-correcao]').innerHTML = `
+      <div class="nota ${acertou ? 'nota--ok' : 'nota--perigo'}">
+        <div class="nota-titulo">${acertou ? 'Correta' : `A resposta é ${String.fromCharCode(65 + atual.correta)}`}</div>
+        <p>${esc(atual.porQue)}</p>
+      </div>
+      <div class="nota nota--info" style="margin-top:var(--e-3)">
+        <div class="nota-titulo">O que a questão pedia</div>
+        <p>${esc(atual.variavelDecisiva)}</p>
+        ${texto ? `<p style="margin-top:var(--e-2)">Você escreveu: <em>"${esc(texto)}"</em>. Se não bateu, o furo não foi de conteúdo — foi ter respondido outra pergunta.</p>`
+                : '<p style="margin-top:var(--e-2);color:var(--atencao)">Você pulou o Freio. Fechar sem dizer o que a questão pede é exatamente o que custa ponto na prova.</p>'}
+      </div>
+      ${Array.isArray(atual.porQueErradas) ? `
+      <details class="cartao cartao--calmo" style="margin-top:var(--e-3)">
+        <summary style="cursor:pointer;font-weight:650">Por que cada alternativa</summary>
+        <div class="empilha" style="margin-top:var(--e-3)">
+          ${atual.porQueErradas.map((t, i) => `<p><strong>${String.fromCharCode(65 + i)}.</strong> ${esc(t)}</p>`).join('')}
+        </div>
+      </details>` : ''}
+      ${atual.pegadinha ? `<div class="nota nota--atencao" style="margin-top:var(--e-3)"><div class="nota-titulo">Pegadinha</div>${esc(atual.pegadinha)}</div>` : ''}
+      ${atual.fonte ? `<p class="miudo fraco" style="margin-top:var(--e-3)">Fonte: ${esc(atual.fonte)}</p>` : ''}
+      <button class="btn btn--principal" data-proxima type="button" style="margin-top:var(--e-4)">Próxima questão</button>`;
+
+    alvo.querySelector('[data-proxima]').addEventListener('click', sortear);
+    atualizarProgressoTopo();
+  }
+
+  raiz.querySelector('[data-sortear]').addEventListener('click', sortear);
+  filtro.addEventListener('change', sortear);
+  sortear();
 }
 
 /* ==========================================================================
@@ -555,6 +910,12 @@ function ir(destino, arg) {
     raiz.innerHTML = telaMetodo();
   } else if (destino === 'papel') {
     raiz.innerHTML = telaPapel();
+    ligarRegua(raiz);
+  } else if (destino === 'anatomia') {
+    criarAnatomia(raiz);
+  } else if (destino === 'aula') {
+    raiz.innerHTML = telaAula(arg);
+    raiz.querySelector('[data-voltar]')?.addEventListener('click', () => ir('modulos'));
   } else if (destino === 'modulos') {
     raiz.innerHTML = telaModulos();
   } else if (destino === 'bancada') {
@@ -566,12 +927,13 @@ function ir(destino, arg) {
     raiz.innerHTML = telaPlantao();
   } else if (destino === 'questoes') {
     raiz.innerHTML = telaQuestoes();
+    ligarQuestoes(raiz);
   } else if (destino === 'desempenho') {
     raiz.innerHTML = telaDesempenho();
     ligarDesempenho(raiz);
   }
 
-  const abaAtiva = destino === 'padrao' ? 'modulos' : destino;
+  const abaAtiva = (destino === 'padrao' || destino === 'aula') ? 'modulos' : destino;
   for (const t of document.querySelectorAll('.aba')) {
     t.setAttribute('aria-selected', String(t.dataset.tela === abaAtiva));
   }
@@ -602,6 +964,8 @@ async function iniciar() {
   // Delegação de clique registrada UMA única vez. Se fosse religada a cada
   // navegação, os manipuladores se acumulariam e um clique dispararia N vezes.
   vista().addEventListener('click', (ev) => {
+    const alvoAula = ev.target.closest('[data-aula]');
+    if (alvoAula) { ir('aula', alvoAula.dataset.aula); return; }
     const alvoPadrao = ev.target.closest('[data-padrao]');
     if (alvoPadrao) { ir('padrao', alvoPadrao.dataset.padrao); return; }
   });

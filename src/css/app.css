@@ -133,7 +133,13 @@
     --mon-p:         #58b6f5;
     --mon-qrs:       #46f0b9;
     --mon-t:         #f5a83c;
+    --mon-neutro:    #6c93a6;
     --mon-rotulo:    #6fa8bd;
+
+    /* mesmas três ondas, em versão escura para o papel claro */
+    --pap-p:         #1a6fb5;
+    --pap-qrs:       #0f7a52;
+    --pap-t:         #a35b0c;
 
     --transicao: 160ms cubic-bezier(0.2, 0.7, 0.3, 1);
   }
@@ -491,10 +497,142 @@
   }
   .ecg-tira:has(.ecg-monitor) { background: var(--mon-bg); border-color: #123240; }
 
-  /* ondas coloridas por componente, só no modo aprendizado */
-  .ecg-onda-p   { stroke: var(--mon-p); }
-  .ecg-onda-qrs { stroke: var(--mon-qrs); }
-  .ecg-onda-t   { stroke: var(--mon-t); }
+  /* ---------- ondas coloridas por componente ----------
+     É o recurso didático mais forte do app: o aluno para de ver um rabisco
+     único e passa a ver três eventos com nome. */
+  .ecg-onda-p    { stroke: var(--mon-p);   stroke-width: calc(var(--ecg-traco-l) + 0.5px); }
+  .ecg-onda-qrs  { stroke: var(--mon-qrs); stroke-width: calc(var(--ecg-traco-l) + 0.7px); }
+  .ecg-onda-t    { stroke: var(--mon-t);   stroke-width: calc(var(--ecg-traco-l) + 0.5px); }
+  .ecg-onda-pr,
+  .ecg-onda-st,
+  .ecg-onda-base { stroke: var(--mon-neutro); stroke-width: var(--ecg-traco-l); }
+  .ecg-traco--fantasma { stroke: var(--mon-neutro); opacity: 0.35; stroke-width: 1px; }
+
+  .ecg-papel .ecg-onda-p    { stroke: var(--pap-p); }
+  .ecg-papel .ecg-onda-qrs  { stroke: var(--pap-qrs); }
+  .ecg-papel .ecg-onda-t    { stroke: var(--pap-t); }
+  .ecg-papel .ecg-onda-pr,
+  .ecg-papel .ecg-onda-st,
+  .ecg-papel .ecg-onda-base { stroke: var(--ecg-tinta); }
+  .ecg-papel .ecg-traco--fantasma { stroke: var(--ecg-tinta); opacity: 0.3; }
+
+  /* rótulos P / QRS / T sobre o primeiro batimento */
+  .ecg-rotulo-onda {
+    font-family: var(--ff-titulo);
+    font-size: 13px; font-weight: 700;
+    paint-order: stroke; stroke-width: 3.5px; stroke-linejoin: round;
+  }
+  .ecg-monitor .ecg-rotulo-onda { stroke: var(--mon-bg); }
+  .ecg-papel   .ecg-rotulo-onda { stroke: var(--ecg-bg); }
+  .ecg-rotulo-p   { fill: var(--mon-p); }
+  .ecg-rotulo-qrs { fill: var(--mon-qrs); }
+  .ecg-rotulo-t   { fill: var(--mon-t); }
+  .ecg-papel .ecg-rotulo-p   { fill: var(--pap-p); }
+  .ecg-papel .ecg-rotulo-qrs { fill: var(--pap-qrs); }
+  .ecg-papel .ecg-rotulo-t   { fill: var(--pap-t); }
+
+  /* ---------- o traço se desenhando ----------
+     Ver o traçado nascer da esquerda para a direita ensina que ele é TEMPO
+     passando, não um desenho estático. */
+  .ecg-desenha {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: ecg-desenhar 2.6s cubic-bezier(0.25, 0.6, 0.35, 1) forwards;
+  }
+  @keyframes ecg-desenhar { to { stroke-dashoffset: 0; } }
+
+  .ecg-onda-p.ecg-desenha   { animation-delay: 0s; }
+  .ecg-onda-qrs.ecg-desenha { animation-delay: 0.05s; }
+  .ecg-onda-t.ecg-desenha   { animation-delay: 0.1s; }
+
+  /* ---------- varredura do monitor ---------- */
+  .ecg-varredura {
+    position: absolute; inset-block: 0; width: 70px;
+    pointer-events: none; z-index: 1;
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.05), rgb(120 220 255 / 0.05), transparent);
+    animation: ecg-varrer 8s ease-in-out infinite;
+  }
+  @keyframes ecg-varrer {
+    0%   { left: -12%; }
+    50%  { left: 92%; }
+    100% { left: -12%; }
+  }
+
+  .ecg-pulso {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--mon-qrs); margin-right: 6px;
+    box-shadow: 0 0 6px var(--mon-qrs);
+    animation: ecg-pulsar 1.6s ease-in-out infinite;
+  }
+  @keyframes ecg-pulsar { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+
+  /* ---------- holofote da leitura guiada ----------
+     Uma faixa que caminha até o achado que está sendo explicado. Sem ela, o
+     aluno lê "olhe o PR" e não sabe onde é o PR. */
+  .ecg-holofote {
+    position: absolute; top: 4%; bottom: 12%; left: 0; width: 16%;
+    background: color-mix(in srgb, var(--atencao) 16%, transparent);
+    border-inline: 1px dashed var(--atencao);
+    border-radius: 3px;
+    pointer-events: none; z-index: 2;
+    transition: left 480ms cubic-bezier(0.3, 0.85, 0.3, 1), width 480ms, opacity 260ms;
+  }
+  .ecg-holofote-rotulo {
+    position: absolute; top: 3px; translate: -50% 0;
+    font-family: var(--ff-mono); font-size: 10px; font-weight: 700;
+    color: var(--atencao); background: var(--superficie);
+    border: 1px solid var(--atencao-borda); border-radius: var(--r-pill);
+    padding: 1px 8px; white-space: nowrap;
+    pointer-events: none; z-index: 3;
+    transition: left 480ms cubic-bezier(0.3, 0.85, 0.3, 1), opacity 260ms;
+  }
+  .ecg-holofote[hidden], .ecg-holofote-rotulo[hidden] { display: none; }
+
+  .ecg-palco { position: relative; }
+
+  /* ---------- anatomia do batimento ---------- */
+  .anat-grade {
+    display: grid; gap: var(--e-4);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 15rem);
+    align-items: start;
+  }
+  @media (max-width: 46rem) { .anat-grade { grid-template-columns: 1fr; } }
+
+  .anat-botoes { display: flex; flex-wrap: wrap; gap: var(--e-2); }
+  .anat-botao {
+    min-height: var(--toque); padding: var(--e-2) var(--e-4);
+    border: 1px solid var(--linha-2); border-radius: var(--r-pill);
+    font-family: var(--ff-mono); font-size: var(--t--1); font-weight: 600;
+    color: var(--tinta-2); background: var(--superficie);
+    transition: all var(--transicao);
+  }
+  .anat-botao:hover { border-color: var(--linha-forte); color: var(--tinta); }
+  .anat-botao[aria-pressed="true"] {
+    background: var(--tinta); color: var(--papel); border-color: var(--tinta);
+  }
+
+  .anat-svg .peca      { transition: opacity 250ms, stroke 250ms, fill 250ms, stroke-width 250ms; }
+  .anat-svg .peca      { opacity: 0.22; }
+  .anat-svg .peca.ativa { opacity: 1; }
+  .anat-coracao        { fill: var(--papel-2); stroke: var(--linha-2); stroke-width: 1.5; }
+  .anat-legenda        { fill: var(--tinta-3); font-family: var(--ff-mono); font-size: 9px; }
+
+  .anat-explica {
+    border: 1px solid var(--info-borda); border-radius: var(--r-3);
+    background: var(--info-fraco); padding: var(--e-4);
+  }
+  .anat-explica h4 { margin-bottom: var(--e-2); }
+  .anat-explica dt {
+    font-family: var(--ff-mono); font-size: var(--t--2);
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--info); margin-top: var(--e-3);
+  }
+  .anat-explica dd { margin: 2px 0 0; }
+  .anat-normal {
+    font-family: var(--ff-mono); font-size: var(--t--1);
+    color: var(--ok); margin-top: var(--e-3);
+    padding-top: var(--e-3); border-top: 1px solid var(--info-borda);
+  }
 
   /* --- cabeçalho e rodapé da tira --- */
   .ecg-cabeca, .ecg-pe {

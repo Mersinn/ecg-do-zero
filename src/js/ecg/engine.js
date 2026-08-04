@@ -532,6 +532,98 @@ function pulsoCalibracao({ mmPx, ganho, linhaBase, largura = 5 }) {
     `L${(x0 + lPx).toFixed(2)} ${yTopo.toFixed(2)} L${(x0 + lPx).toFixed(2)} ${linhaBase.toFixed(2)}`;
 }
 
+/* --------------------------------------------------------------------------
+   SEGMENTAÇÃO POR COMPONENTE DA ONDA
+   Colorir cada onda separadamente é o recurso didático mais forte do app: o
+   aluno para de ver "um rabisco" e passa a ver P, QRS e T como três eventos
+   distintos, com nomes. Só depois disso o traçado monocromático faz sentido.
+   -------------------------------------------------------------------------- */
+
+const COMPONENTES = ['p', 'pr', 'qrs', 'st', 't'];
+
+/** Descobre a que componente pertence o instante t (ms) de um ritmo. */
+function componenteEm(ritmo, t) {
+  for (const ev of ritmo.eventos) {
+    const m = ev.modelo.marcos;
+    const rel = t - ev.t0;
+    if (rel < 0 || rel > ev.modelo.duracao) continue;
+    if (m.inicioP != null && rel >= m.inicioP && rel <= m.fimP) return 'p';
+    if (m.inicioP != null && rel > m.fimP && rel < m.inicioQRS) return 'pr';
+    if (rel >= m.inicioQRS && rel <= m.fimQRS) return 'qrs';
+    if (rel > m.pontoJ && rel <= m.fimST) return 'st';
+    if (rel > m.inicioT && rel <= m.fimT) return 't';
+  }
+  return 'base';
+}
+
+/**
+ * Gera um path por componente, para que cada onda receba sua própria cor.
+ * Os segmentos se sobrepõem em um ponto para não abrir buraco entre eles.
+ */
+function caminhosPorComponente(amostras, ritmo, opts) {
+  const { mmPx, velocidade, ganho, linhaBase, offsetX = 0 } = opts;
+  const pxPorMs = (velocidade / 1000) * mmPx;
+  const pxPorMv = ganho * mmPx;
+
+  const trechos = [];
+  let atual = null;
+
+  for (let i = 0; i < amostras.length; i++) {
+    const t = i * PASSO_MS;
+    const comp = componenteEm(ritmo, t);
+    const x = offsetX + t * pxPorMs;
+    const y = linhaBase - amostras[i] * pxPorMv;
+
+    if (!atual || atual.comp !== comp) {
+      if (atual) atual.pontos.push([x, y]); // fecha sem buraco
+      atual = { comp, pontos: [[x, y]] };
+      trechos.push(atual);
+    } else {
+      atual.pontos.push([x, y]);
+    }
+  }
+
+  return trechos
+    .filter((tr) => tr.pontos.length > 1)
+    .map((tr) => {
+      const red = simplificar(tr.pontos, 0.1);
+      let d = `M${red[0][0].toFixed(2)} ${red[0][1].toFixed(2)}`;
+      for (let i = 1; i < red.length; i++) d += ` L${red[i][0].toFixed(2)} ${red[i][1].toFixed(2)}`;
+      return { comp: tr.comp, d };
+    });
+}
+
+/** Posição do rótulo (P, QRS, T) sobre o primeiro batimento completo. */
+function rotulosDeOnda(ritmo, opts) {
+  const { mmPx, velocidade, ganho, linhaBase, offsetX = 0 } = opts;
+  const pxPorMs = (velocidade / 1000) * mmPx;
+  const pxPorMv = ganho * mmPx;
+
+  const ev = ritmo.eventos.find((e) => e.modelo.marcos.inicioQRS != null && !e.bloqueada);
+  if (!ev) return [];
+
+  const m = ev.modelo.marcos;
+  const cfg = ev.modelo.cfg;
+  const marcar = [];
+
+  const põe = (comp, letra, tRel, amp) => {
+    if (amp === 0) return;
+    const x = offsetX + (ev.t0 + tRel) * pxPorMs;
+    const yOnda = linhaBase - amp * pxPorMv;
+    // Acima do pico quando há espaço; abaixo quando o pico encosta no topo.
+    const y = yOnda > 22 ? yOnda - 9 : yOnda + 18;
+    marcar.push({ comp, letra, x, y });
+  };
+
+  if (m.inicioP != null && cfg.pAmp !== 0) põe('p', 'P', (m.inicioP + m.fimP) / 2, cfg.pAmp);
+  const forma = QRS[cfg.qrs] || QRS.normal;
+  const pico = forma.reduce((a, b) => (Math.abs(b[1]) > Math.abs(a[1]) ? b : a));
+  põe('qrs', 'QRS', m.inicioQRS + pico[0] * cfg.qrsLargura, pico[1] * cfg.qrsEscala);
+  if (cfg.tAmp !== 0) põe('t', 'T', (m.inicioT + m.fimT) / 2, cfg.tAmp);
+
+  return marcar;
+}
+
 /**
  * Renderiza uma tira de ECG como SVG.
  *
@@ -558,6 +650,9 @@ export function renderizarTira(ritmo, opts = {}) {
     ganho = PAPEL.ganho,
     calibracao = estilo === 'papel',
     id = '',
+    segmentado = false,   // pinta cada onda com sua própria cor
+    rotularOndas = false, // escreve P, QRS e T sobre o primeiro batimento
+    animar = false,       // o traço se desenha da esquerda para a direita
   } = opts;
 
   const amostras = amostrar(ritmo);
@@ -571,7 +666,26 @@ export function renderizarTira(ritmo, opts = {}) {
   const linhaBase = h * 0.62; // deixa mais espaço acima, onde vive o R
 
   const offsetX = margemCalibracaoMm * mmPx;
-  const d = caminho(amostras, { mmPx, velocidade, ganho, linhaBase, offsetX });
+  const geo = { mmPx, velocidade, ganho, linhaBase, offsetX };
+
+  let traco;
+  if (segmentado) {
+    // Traço-fantasma por baixo dá continuidade visual entre os segmentos.
+    const inteiro = caminho(amostras, geo);
+    const partes = caminhosPorComponente(amostras, ritmo, geo);
+    traco =
+      `<path class="ecg-traco ecg-traco--fantasma" d="${inteiro}"/>` +
+      partes.map((p) => `<path class="ecg-traco ecg-onda-${p.comp}${animar ? ' ecg-desenha' : ''}" pathLength="1" d="${p.d}"/>`).join('');
+  } else {
+    const d = caminho(amostras, geo);
+    traco = `<path class="ecg-traco${animar ? ' ecg-desenha' : ''}" pathLength="1" d="${d}"/>`;
+  }
+
+  const rotulos = rotularOndas
+    ? rotulosDeOnda(ritmo, geo)
+        .map((r) => `<text class="ecg-rotulo-onda ecg-rotulo-${r.comp}" x="${r.x.toFixed(1)}" y="${r.y.toFixed(1)}" text-anchor="middle">${r.letra}</text>`)
+        .join('')
+    : '';
 
   const gradeId = `grade-${id || Math.random().toString(36).slice(2, 8)}`;
 
@@ -597,7 +711,8 @@ export function renderizarTira(ritmo, opts = {}) {
   <rect class="ecg-fundo" width="${w.toFixed(0)}" height="${h.toFixed(0)}"/>
   <rect class="ecg-grade" width="${w.toFixed(0)}" height="${h.toFixed(0)}" fill="url(#${gradeId})"/>
   ${cal}
-  <path class="ecg-traco" d="${d}"/>
+  ${traco}
+  ${rotulos}
   ${rotulo}
 </svg>`;
 }

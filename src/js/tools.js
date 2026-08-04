@@ -565,12 +565,41 @@ export function criarPaquimetro(container, { padraoChave = 'normal', montarRitmo
   let mmPx = 3;
   let xA = 60;
   let xB = 120;
+  let verdade = null;   // valores REAIS do traçado exibido, em ms
+  let geometria = null; // para posicionar os marcadores nos marcos certos
+
+  /**
+   * Extrai os valores verdadeiros do ritmo renderizado.
+   *
+   * Isto substitui uma tabela de valores fixos que existia antes e que era
+   * simplesmente uma mentira: o app "corrigia" a medida do aluno contra um
+   * número que não pertencia ao traçado na tela. Num app cujo objetivo é
+   * ensinar a medir, é o pior defeito possível.
+   */
+  function extrairVerdade(ritmo) {
+    const ev = ritmo.eventos.find((e) => !e.bloqueada && e.modelo.marcos.inicioQRS != null);
+    if (!ev) return null;
+    const m = ev.modelo.marcos;
+    const temP = m.inicioP != null;
+    const rr = ritmo.rr || (ritmo.eventos[1] ? ritmo.eventos[1].t0 - ritmo.eventos[0].t0 : null);
+    return {
+      pr: temP ? Math.round(m.inicioQRS - m.inicioP) : null,
+      qrs: Math.round(m.durQRS),
+      qt: Math.round(m.qt),
+      rr: rr ? Math.round(rr) : null,
+      // instantes absolutos, para ancorar os marcadores no lugar certo
+      t0: ev.t0,
+      marcos: m,
+    };
+  }
 
   function desenharTracado() {
     mmPx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mm')) || 3;
     const ritmo = montarRitmo
       ? montarRitmo(padraoChave)
       : ritmoRegular({ fc: 72, duracao: 5000 });
+    verdade = extrairVerdade(ritmo);
+    geometria = { pxPorMs: (PAPEL.velocidade / 1000) * mmPx, offsetX: 10 * mmPx };
 
     elPalco.innerHTML =
       renderizarTira(ritmo, { estilo: 'papel', mmPx, derivacao: 'DII', id: 'paq' }) +
@@ -679,17 +708,33 @@ export function criarPaquimetro(container, { padraoChave = 'normal', montarRitmo
     atualizarLeitura();
   });
 
+  const ANCORAS = {
+    pr:  'do <strong>início da onda P</strong> ao <strong>início do QRS</strong> — não ao pico do R',
+    qrs: 'do <strong>início</strong> ao <strong>fim do complexo</strong>, onde ele volta à linha de base',
+    qt:  'do <strong>início do QRS</strong> ao <strong>fim da onda T</strong>, onde ela reencontra a linha de base',
+    rr:  'de um <strong>pico R</strong> ao <strong>pico R seguinte</strong>',
+  };
+
   container.querySelector('[data-aferir]').addEventListener('click', () => {
-    modoAferido = true;
     const m = MEDIDAS[medida];
-    // O alvo é derivado do traçado exibido, não sorteado.
-    const valores = { pr: 160, qrs: 90, qt: 380, rr: Math.round(60000 / 72) };
-    alvo = { valor: valores[medida] };
+    const real = verdade ? verdade[medida] : null;
+
+    if (real == null) {
+      elVeredito.innerHTML = `<div class="nota nota--atencao">
+        <div class="nota-titulo">Não dá para aferir aqui</div>
+        Este traçado não tem ${m.nome.toLowerCase()} mensurável — por exemplo, não há onda P para
+        medir o PR. Escolha outra medida ou outro traçado.</div>`;
+      modoAferido = false;
+      alvo = null;
+      return;
+    }
+
+    modoAferido = true;
+    alvo = { valor: real };
     elVeredito.innerHTML = `<div class="nota nota--info">
       <div class="nota-titulo">Medida solicitada</div>
-      Meça o <strong>${m.nome.toLowerCase()}</strong> deste traçado. Posicione os dois marcadores e a
-      correção aparece sozinha. Ancore no <em>início</em> de cada onda, não no pico.
-    </div>`;
+      Meça o <strong>${m.nome.toLowerCase()}</strong> deste traçado. Ancore ${ANCORAS[medida]}.
+      A correção aparece sozinha assim que você posicionar os dois marcadores.</div>`;
     atualizarLeitura();
   });
 
