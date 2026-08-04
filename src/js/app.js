@@ -127,7 +127,12 @@ function tiraGuiada(chave) {
     estilo: 'monitor', mmPx: mmPx(), derivacao: p.derivacao, id: `g-${chave}`,
     segmentado: true, rotularOndas: true, animar: true,
   });
-  return `<div class="ecg-tira" data-tira-guiada data-duracao="${ritmo.duracao}">
+  // Geometria exata do SVG, para o holofote nao precisar adivinhar.
+  // Espelha renderizarTira: margem de calibracao + tracado + folga.
+  const margemMm = 2;
+  const larguraMm = (ritmo.duracao / 1000) * 25 + margemMm + 2;
+  return `<div class="ecg-tira" data-tira-guiada data-duracao="${ritmo.duracao}"
+       data-largura-mm="${larguraMm.toFixed(2)}" data-margem-mm="${margemMm}">
     <div class="ecg-cabeca">
       <span><span class="ecg-pulso"></span>${esc(p.nome)} · ${esc(p.derivacao)}</span>
       <span class="ecg-calib-texto">25 mm/s · 10 mm/mV</span>
@@ -420,21 +425,47 @@ function ligarTelaPadrao(raiz, chave) {
     const duracao = Number(tiraEl?.dataset.duracao || 0);
     const svgEl = raiz.querySelector('[data-palco-guiado] svg');
 
-    /** Move a faixa de destaque até o instante tMs do traçado. */
-    const holofote = (tMs, rotulo) => {
-      if (!holo || !svgEl || !duracao) return;
-      if (tMs == null) { holo.hidden = true; holoRot.hidden = true; return; }
-      const largura = svgEl.viewBox.baseVal.width || svgEl.clientWidth;
-      // O traçado começa depois da margem do pulso de calibração.
-      const inicio = 10 / (largura / svgEl.clientWidth || 1);
-      const fracao = Math.max(0, Math.min(1, (tMs / duracao) * 0.9 + 0.06));
-      const larguraFaixa = 0.14;
-      holo.hidden = false; holoRot.hidden = false;
+    /**
+     * Move a faixa de destaque ate o instante tMs do tracado.
+     *
+     * A conta vem da geometria real do SVG, nao de aproximacao. A versao
+     * anterior usava (tMs/duracao)*0.9 + 0.06, um fator inventado que errava
+     * por cerca de 229 ms: o holofote da onda P caia em cima do QRS.
+     */
+    const larguraMm = Number(tiraEl?.dataset.larguraMm || 0);
+    const margemMm = Number(tiraEl?.dataset.margemMm || 0);
+
+    const ROTULO_FOCO = {
+      p: 'onda P', pr: 'intervalo PR', qrs: 'complexo QRS', j: 'ponto J',
+      st: 'segmento ST', t: 'onda T', qt: 'intervalo QT',
+      fc: 'frequencia', ritmo: 'ritmo', eixo: 'eixo',
+      intervalos: 'intervalos', tira: 'a tira inteira', sintese: 'sintese',
+    };
+
+    const holofote = (tMs, foco) => {
+      if (!holo) return;
+      if (tMs == null || !larguraMm) { holo.hidden = true; holoRot.hidden = true; return; }
+
+      // Posicao em mm dentro do SVG: margem de calibracao + tempo a 25 mm/s.
+      const posMm = margemMm + (tMs / 1000) * 25;
+      const fracao = Math.max(0, Math.min(1, posMm / larguraMm));
+
+      // Faixa de 6 mm: larga o bastante para conter uma onda, estreita o
+      // bastante para nao cobrir o batimento vizinho.
+      const larguraFaixa = Math.min(0.5, 6 / larguraMm);
+
+      holo.hidden = false;
+      holoRot.hidden = false;
       holo.style.left = `${Math.max(0, Math.min(1 - larguraFaixa, fracao - larguraFaixa / 2)) * 100}%`;
       holo.style.width = `${larguraFaixa * 100}%`;
-      holoRot.style.left = `${Math.max(8, Math.min(92, fracao * 100))}%`;
-      holoRot.textContent = rotulo || 'olhe aqui';
-      void inicio;
+      holoRot.style.left = `${Math.max(6, Math.min(94, fracao * 100))}%`;
+      holoRot.textContent = ROTULO_FOCO[foco] || 'olhe aqui';
+
+      // Rola a tira para deixar o achado visivel no celular.
+      const sc = raiz.querySelector('[data-tira-guiada] .ecg-scroller');
+      if (sc && sc.scrollWidth > sc.clientWidth) {
+        sc.scrollTo({ left: fracao * sc.scrollWidth - sc.clientWidth / 2, behavior: 'smooth' });
+      }
     };
 
     const pintar = () => {
