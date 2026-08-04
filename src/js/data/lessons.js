@@ -290,7 +290,7 @@ export const MODULOS = [
         porQue:
           'Restaurar a contração atrial em um átrio que ficou parado por dias pode lançar um trombo na circulação sistêmica. A anticoagulação prévia ou o ecocardiograma transesofágico existem para evitar isso.',
         comoEvitar:
-          'Cardioversão eletiva exige anticoagulação adequada por período suficiente ou ecocardiograma transesofágico excluindo trombo, e anticoagulação mantida depois do procedimento. Note a divergência de convenções: o limiar clássico de duração é de 48 horas, e a diretriz europeia de 2024 baixou esse limiar para 24 horas. Paciente instável, contudo, cardioverte imediatamente.',
+          'Cardioversão eletiva exige anticoagulação adequada por período suficiente ou ecocardiograma transesofágico excluindo trombo, e anticoagulação mantida depois do procedimento. Note a divergência de convenções: o limiar clássico de duração é de 48 horas, e as Diretrizes de 2024 para o manejo da fibrilação atrial da Sociedade Europeia de Cardiologia com a Associação Europeia de Cirurgia Cardiotorácica (ESC/EACTS 2024, European Heart Journal) baixaram esse limiar para 24 horas. Paciente instável, contudo, cardioverte imediatamente.',
       },
       {
         erro: 'Cardioverter taquicardia sinusal.',

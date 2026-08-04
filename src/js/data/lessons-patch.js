@@ -18,7 +18,7 @@
  * campos que ele não altera: o QTc (450/470 ms pela SBC 2022 contra 450/460 ms
  * do guia de OSCE, em `ancoras` de `outros` e na síntese do roteiro `qtLongo`) e
  * o limiar de duração para cardioversão eletiva na fibrilação atrial (48 h
- * clássicas contra 24 h da diretriz europeia de 2024), que segue em
+ * clássicas contra 24 h das Diretrizes ESC/EACTS de 2024), que segue em
  * `errosComuns` de `taqui` e é reescrito aqui sem perder as duas convenções.
  *
  * ---------------------------------------------------------------------------
@@ -218,7 +218,7 @@ export const PATCH_MODULOS = {
         porQue:
           'Restaurar a contração de um átrio que ficou parado por dias pode lançar um trombo na circulação sistêmica. A anticoagulação prévia e o ecocardiograma transesofágico existem para evitar exatamente isso.',
         comoEvitar:
-          'Cardioversão eletiva exige anticoagulação adequada por período suficiente ou ecocardiograma transesofágico excluindo trombo, com anticoagulação mantida depois do procedimento. Saiba as duas convenções de limiar de duração, porque elas mudam a resposta: 48 horas no critério clássico e 24 horas na diretriz europeia de 2024. Paciente instável cardioverte imediatamente.',
+          'Cardioversão eletiva exige anticoagulação adequada por período suficiente ou ecocardiograma transesofágico excluindo trombo, com anticoagulação mantida depois do procedimento. Saiba as duas convenções de limiar de duração, porque elas mudam a resposta: 48 horas no critério clássico e 24 horas nas Diretrizes de 2024 para o manejo da fibrilação atrial da Sociedade Europeia de Cardiologia com a Associação Europeia de Cirurgia Cardiotorácica (ESC/EACTS 2024). Paciente instável cardioverte imediatamente.',
       },
       {
         erro: 'Cardioverter taquicardia sinusal.',

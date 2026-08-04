@@ -12,7 +12,7 @@
 
 import {
   ritmoRegular, renderizarTira, eixoEletrico, msParaMm, mmParaMs,
-  qtcBazett, qtcFridericia, fcDeRR, PAPEL,
+  qtcBazett, qtcFridericia, fcDeRR, PAPEL, QRS,
 } from './ecg/engine.js';
 
 /* ==========================================================================
@@ -406,30 +406,53 @@ export function criarEixo(container) {
   const elControles = container.querySelector('[data-controles-eixo]');
   const elPresets = container.querySelector('[data-presets]');
 
+  // Ao mexer nos controles a mao, nenhum preset descreve mais o tracado.
+  const limparPreset = () => {
+    for (const b of elPresets.querySelectorAll('[data-preset]')) b.setAttribute('aria-pressed', 'false');
+    elNota.textContent = '';
+  };
+
   const ctrlDi = criarControle(
     { nome: 'DI', min: -10, max: 10, passo: 1, valor: di, formatar: (v) => `${v > 0 ? '+' : ''}${v} mm` },
-    (v) => { di = v; desenhar(); },
+    (v) => { di = v; limparPreset(); desenhar(); },
   );
   const ctrlAvf = criarControle(
     { nome: 'aVF', min: -10, max: 10, passo: 1, valor: avf, formatar: (v) => `${v > 0 ? '+' : ''}${v} mm` },
-    (v) => { avf = v; desenhar(); },
+    (v) => { avf = v; limparPreset(); desenhar(); },
   );
   elControles.append(ctrlDi.el, ctrlAvf.el);
 
-  for (const preset of PRESETS_EIXO) {
+  /**
+   * Estado ativo nos presets.
+   *
+   * Sem isto o realce de hover parecia seleção: o aluno passava o dedo em
+   * "hemibloqueio anterior esquerdo", via os valores de OUTRO preset na tela e
+   * concluía que hemibloqueio anterior dá desvio à direita. O app não errava a
+   * conta, mas mentia na leitura, que dá no mesmo.
+   */
+  function marcarAtivo(indice) {
+    for (const b of elPresets.querySelectorAll('[data-preset]')) {
+      b.setAttribute('aria-pressed', String(Number(b.dataset.preset) === indice));
+    }
+  }
+
+  PRESETS_EIXO.forEach((preset, i) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'btn btn--contorno btn--pequeno';
+    b.dataset.preset = i;
+    b.setAttribute('aria-pressed', 'false');
     b.textContent = preset.nome;
     b.addEventListener('click', () => {
       di = preset.di; avf = preset.avf;
       ctrlDi.input.value = di; ctrlDi.atualizar();
       ctrlAvf.input.value = avf; ctrlAvf.atualizar();
       elNota.textContent = preset.nota;
+      marcarAtivo(i);
       desenhar();
     });
     elPresets.appendChild(b);
-  }
+  });
 
   function rodaSVG(angulo, quadrante) {
     const R = 84;
@@ -498,174 +521,451 @@ export function criarEixo(container) {
 
 /* ==========================================================================
    3. PAQUÍMETRO
+   --------------------------------------------------------------------------
+   Reescrito depois do relato do autor: "não entendi a estrutura e a
+   funcionalidade, mesmo alternando entre A e B". Havia três defeitos
+   concretos por trás disso, e cada um tem aqui a sua correção.
+
+   1. Os marcadores se chamavam A e B. Não diziam o que eram nem onde
+      ancorar. Agora cada marcador carrega o nome do ponto em que ele vai
+      ("início da P", "início do QRS") e esse nome muda junto com a tarefa.
+   2. A ferramenta abria vazia, com os dois marcadores num lugar arbitrário
+      do traçado e nenhuma tarefa. Agora abre com UMA tarefa já proposta,
+      "meça o intervalo PR deste traçado", e os marcadores pousados perto do
+      lugar certo, deslocados de propósito. O aluno ajusta, não adivinha.
+   3. A correção morava atrás de um botão que não explicava nada e, uma vez
+      ligada, revelava o valor verdadeiro no primeiro milímetro de arrasto.
+      Isso transformava medir em caçar o número até ele bater. Agora conferir
+      é um passo explícito, a tolerância é dita antes, e o gabarito aparece
+      desenhado sobre o traçado, no lugar exato onde ele estava.
+
+   O traçado desta ferramenta é desenhado ampliado duas vezes. A 3 px por
+   milímetro, meio quadradinho tem 1,5 px e nenhum dedo acerta isso. Ampliado,
+   meio quadradinho passa a ter 3 px e a tolerância vira alcançável sem deixar
+   de ser exigente. As contagens em milímetro continuam corretas, porque saem
+   da mesma escala usada para desenhar.
    ========================================================================== */
 
-const MEDIDAS = {
-  pr:  { nome: 'Intervalo PR',   min: 120, max: 200, unidade: 'ms',
-         normal: 'PR normal (120 a 200 ms).',
-         baixo: 'PR curto, pense em pré-excitação ou ritmo juncional.',
-         alto: 'PR longo, acima de 200 ms. Fixo e com todo P conduzindo, é BAV de 1º grau.' },
-  qrs: { nome: 'Duração do QRS', min: 0, max: 119, unidade: 'ms',
-         normal: 'QRS estreito (abaixo de 120 ms).',
-         baixo: 'Medida implausível, reveja os marcadores.',
-         alto: 'QRS largo, 120 ms ou mais. Olhe V1 para separar BRD de BRE.' },
-  qt:  { nome: 'Intervalo QT',   min: 300, max: 450, unidade: 'ms',
-         normal: 'QT dentro da faixa esperada, mas corrija pela frequência antes de concluir.',
-         baixo: 'QT curto. Abaixo de 340 ms, considere hipercalcemia ou síndrome do QT curto.',
-         alto: 'QT longo. Corrija pela frequência: QTc acima de 500 ms indica risco alto de torsades.' },
-  rr:  { nome: 'Intervalo RR',   min: 600, max: 1000, unidade: 'ms',
-         normal: 'RR compatível com frequência entre 60 e 100 bpm.',
-         baixo: 'RR curto, taquicardia.',
-         alto: 'RR longo, bradicardia.' },
-};
+/** Ampliação da tira do paquímetro. Ver a nota acima: existe pelo dedo. */
+const ZOOM_PAQ = 2;
 
-export function criarPaquimetro(container, { padraoChave = 'normal', montarRitmo } = {}) {
-  let medida = 'pr';
-  let modoAferido = false;
-  let alvo = null;
+/** Tira curta: o aluno mede um batimento, não navega por sete segundos. */
+const DURACAO_PAQ = 3600;
+
+/**
+ * Padrões que servem de traçado para medir.
+ *
+ * Todos são ritmos regulares da biblioteca, com onda P identificável e
+ * amplitude que cabe na altura da tira. Nenhum deles é gerado aqui: a
+ * ferramenta mede traçados que existem no resto do app.
+ */
+const TRACADOS_PAQ = ['normal', 'bradicardia', 'taquiSinusal', 'bav1', 'brd', 'sobrecargaAD', 'qtLongo'];
+
+/**
+ * As tarefas de medição.
+ *
+ * `de` e `ate` são o texto que vai NO marcador, não numa legenda distante:
+ * era exatamente isso que faltava. `tolerancia` é a folga aceita, em ms, e
+ * aparece na tela antes de o aluno conferir, nunca depois.
+ *
+ * As faixas de normalidade repetem as que já estão em library.js e no laudo do
+ * gerador. Nenhum critério novo é introduzido aqui.
+ */
+const TAREFAS = [
+  {
+    id: 'pr',
+    nome: 'intervalo PR',
+    artigo: 'o',
+    rotulo: 'Intervalo PR',
+    de: 'início da P',
+    ate: 'início do QRS',
+    ancorar: 'Comece onde a onda P deixa a linha de base. Termine onde o QRS começa a subir, não no pico do R.',
+    treina: 'O PR mede a viagem do estímulo do átrio até o ventrículo. É por ele que se separa condução normal de bloqueio AV.',
+    tolerancia: 20,
+    min: 120,
+    max: 200,
+    normal: 'PR dentro da faixa normal, de 120 a 200 ms.',
+    baixo: 'PR curto, abaixo de 120 ms. Pense em pré-excitação (WPW) ou em ritmo juncional.',
+    alto: 'PR longo, acima de 200 ms. Fixo e com todo P conduzindo, é BAV de 1º grau.',
+  },
+  {
+    id: 'qrs',
+    nome: 'duração do QRS',
+    artigo: 'a',
+    rotulo: 'Duração do QRS',
+    de: 'início do QRS',
+    ate: 'ponto J',
+    ancorar: 'Comece onde o complexo deixa a linha de base. Termine no ponto J, onde ele volta a ela. O ponto J é o fim do QRS mesmo quando o ST sobe ou desce logo depois.',
+    treina: 'Estreito ou largo é a bifurcação que decide metade das taquicardias e todos os bloqueios de ramo.',
+    tolerancia: 20,
+    min: 0,
+    max: 119,
+    normal: 'QRS estreito, abaixo de 120 ms.',
+    baixo: 'Medida implausível para um QRS. Reveja onde você ancorou.',
+    alto: 'QRS largo, 120 ms ou mais. Olhe V1 para separar bloqueio de ramo direito de esquerdo. Se não houver onda P, considere origem ventricular.',
+  },
+  {
+    id: 'qt',
+    nome: 'intervalo QT',
+    artigo: 'o',
+    rotulo: 'Intervalo QT',
+    de: 'início do QRS',
+    ate: 'fim da onda T',
+    ancorar: 'Comece no mesmo ponto do QRS. Termine onde a onda T reencontra a linha de base. Quando a T termina em rampa, a saída é a tangente ao ramo descendente.',
+    treina: 'O QT bruto quase não decide nada sozinho: ele só passa a significar alguma coisa depois de corrigido pela frequência.',
+    tolerancia: 40,
+    min: 340,
+    max: 450,
+    normal: 'QT bruto dentro da faixa esperada. Corrija pela frequência antes de concluir qualquer coisa.',
+    baixo: 'QT bruto curto. Corrija pela frequência: QTc abaixo de 340 ms levanta síndrome do QT curto ou hipercalcemia (Diretriz da SBC de 2022).',
+    alto: 'QT longo. Corrija pela frequência: QTc acima de 500 ms indica risco alto de torsades.',
+  },
+  {
+    id: 'rr',
+    nome: 'intervalo RR',
+    artigo: 'o',
+    rotulo: 'Intervalo RR e frequência',
+    de: 'pico do R',
+    ate: 'pico do R seguinte',
+    ancorar: 'De pico a pico. O R é o ponto mais reprodutível do traçado, por isso a frequência se mede nele e não no início do QRS.',
+    treina: 'É daqui que sai a frequência sem contar batimento, e é aqui que se descobre se o ritmo é regular.',
+    tolerancia: 40,
+    min: 600,
+    max: 1000,
+    normal: 'RR compatível com frequência entre 60 e 100 bpm.',
+    baixo: 'RR curto, o que corresponde a taquicardia.',
+    alto: 'RR longo, o que corresponde a bradicardia.',
+  },
+];
+
+/** Instante do pico do R dentro do batimento, em ms a partir do início dele. */
+function picoR(modelo) {
+  const cfg = modelo.cfg || {};
+  const forma = QRS[cfg.qrs] || QRS.normal;
+  const pico = forma.reduce((a, b) => (Math.abs(b[1]) > Math.abs(a[1]) ? b : a));
+  return modelo.marcos.inicioQRS + pico[0] * (cfg.qrsLargura || 1);
+}
+
+/**
+ * Onde a medida pedida COMEÇA e ONDE TERMINA neste traçado, em ms absolutos,
+ * mais o valor verdadeiro em ms.
+ *
+ * Sai da geometria do próprio ritmo renderizado. A versão anterior guardava
+ * uma tabela de valores fixos e corrigia o aluno contra um número que não
+ * pertencia ao traçado da tela. Num app que ensina a medir, é o pior defeito
+ * possível, e ele não pode voltar: tudo aqui vem de `modelo.marcos`.
+ */
+function extrairAncoras(ritmo, idTarefa) {
+  const evs = (ritmo.eventos || []).filter((e) => !e.bloqueada && e.modelo && e.modelo.marcos);
+  if (!evs.length) return null;
+
+  // O segundo batimento, quando existe: o primeiro encosta na margem de
+  // calibração e fica apertado para ancorar com o dedo.
+  const i = evs.length > 2 ? 1 : 0;
+  const ev = evs[i];
+  const prox = evs[i + 1];
+  const m = ev.modelo.marcos;
+
+  let r = null;
+  if (idTarefa === 'pr') {
+    if (m.inicioP == null) return null;
+    r = { tDe: ev.t0 + m.inicioP, tAte: ev.t0 + m.inicioQRS, valor: Math.round(m.inicioQRS - m.inicioP) };
+  } else if (idTarefa === 'qrs') {
+    r = { tDe: ev.t0 + m.inicioQRS, tAte: ev.t0 + m.fimQRS, valor: Math.round(m.durQRS) };
+  } else if (idTarefa === 'qt') {
+    r = { tDe: ev.t0 + m.inicioQRS, tAte: ev.t0 + m.fimT, valor: Math.round(m.qt) };
+  } else if (idTarefa === 'rr') {
+    if (!prox) return null;
+    const a = ev.t0 + picoR(ev.modelo);
+    const b = prox.t0 + picoR(prox.modelo);
+    r = { tDe: a, tAte: b, valor: Math.round(b - a) };
+  }
+
+  if (!r || !(r.valor > 0)) return null;
+  // A medida inteira precisa caber na tira, senão o marcador cai fora do papel.
+  if (r.tAte > ritmo.duracao - 60) return null;
+  return r;
+}
+
+/**
+ * @param {HTMLElement} container
+ * @param {object} opts
+ *   montarRitmo — função da biblioteca que devolve o ritmo de um padrão
+ *   padroes     — mapa PADROES, usado só para saber quais chaves existem e
+ *                 para revelar o nome do traçado DEPOIS da correção
+ */
+export function criarPaquimetro(container, { montarRitmo, padroes = null } = {}) {
+  const escapar = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  let tarefa = TAREFAS[0];
+  let encaixar = true;
+  let conferido = false;
+
+  let ritmo = null;
+  let chaveAtual = null;
+  let derivacao = 'DII';
+  let verdade = null;      // { tDe, tAte, valor }
+
+  let mmPx = 3 * ZOOM_PAQ;
+  let offsetX = 0;
+  let pxPorMs = 0;
+  let larguraPalco = 0;
+  let xDe = 0;
+  let xAte = 0;
 
   container.innerHTML = `
     <div class="cartao empilha">
       <div>
         <h3 class="cartao-titulo">Paquímetro</h3>
-        <p class="cartao-sub">Arraste os dois marcadores sobre o traçado e meça de verdade. Medir é habilidade motora: sem corrigir a medida, você treina o próprio erro.</p>
+        <p class="cartao-sub">Medir é habilidade motora, e habilidade motora sem correção vira erro treinado. Aqui você recebe uma medida para fazer, ajusta os dois marcadores e confere contra o valor real deste traçado.</p>
       </div>
-      <div class="ctrl">
+
+      <div class="paq-tarefa">
+        <p class="paq-pedido" data-pedido></p>
+        <p class="paq-ancorar" data-ancorar></p>
+        <p class="paq-treina" data-treina></p>
+      </div>
+
+      <div class="paq-opcoes">
         <label class="ctrl-nome" for="paq-medida">Estou medindo</label>
-        <select id="paq-medida" class="btn btn--contorno cheio" data-seletor>
-          ${Object.entries(MEDIDAS).map(([k, m]) => `<option value="${k}">${m.nome}</option>`).join('')}
+        <select id="paq-medida" class="btn btn--contorno" data-seletor>
+          ${TAREFAS.map((t) => `<option value="${t.id}">${t.rotulo}</option>`).join('')}
         </select>
-        <span></span>
+        <label class="paq-encaixe">
+          <input type="checkbox" data-encaixe checked>
+          Encaixar na grade, de meio em meio quadradinho
+        </label>
       </div>
+
       <div class="ecg-tira">
-        <div class="ecg-cabeca"><span>Traçado para medir</span><span class="ecg-calib-texto">25 mm/s · 10 mm/mV</span></div>
+        <div class="ecg-cabeca">
+          <span data-cabeca>tira de ritmo</span>
+          <span class="ecg-calib-texto">25 mm/s · 10 mm/mV · ampliado 2 vezes</span>
+        </div>
         <div class="ecg-scroller" data-scroller>
           <div class="paq-palco" data-palco></div>
         </div>
-        <div class="ecg-dica-rolagem" data-toque-apenas>Arraste os marcadores azuis. A área vazia continua rolando o traçado.</div>
+        <div class="ecg-dica-rolagem">Arraste os dois marcadores rotulados. A área vazia do papel continua rolando a tira. Pelo teclado: Tab até um marcador e setas, meio quadradinho por vez, cinco quadradinhos com Shift.</div>
       </div>
+
       <div class="laudo">
-        <div class="laudo-linha"><span class="laudo-chave">Medida</span><span class="laudo-valor mono" data-medida>arraste os marcadores</span></div>
-        <div class="laudo-linha"><span class="laudo-chave">Leitura</span><span class="laudo-valor" data-leitura>sem medida ainda</span></div>
+        <div class="laudo-linha"><span class="laudo-chave">Sua medida</span><span class="laudo-valor mono" data-medida></span></div>
+        <div class="laudo-linha"><span class="laudo-chave">O que a sua medida diria</span><span class="laudo-valor" data-leitura></span></div>
       </div>
+
       <div class="linha">
-        <button class="btn btn--principal" data-aferir type="button">Me dê uma medida para fazer</button>
-        <button class="btn btn--fantasma" data-outro-tracado type="button">Outro traçado</button>
+        <button class="btn btn--principal" data-conferir type="button">Conferir minha medida</button>
+        <button class="btn btn--contorno" data-proxima type="button">Outra medida</button>
+        <button class="btn btn--fantasma" data-mostrar type="button">Mostrar onde é</button>
       </div>
+
       <div data-veredito></div>
+
+      <p class="miudo fraco">Traçado sintético, gerado por equações a partir dos parâmetros da biblioteca de padrões. O valor conferido é o valor real desse traçado, calculado da mesma geometria que o desenhou, e não uma tabela à parte.</p>
     </div>`;
 
   const elPalco = container.querySelector('[data-palco]');
   const elScroller = container.querySelector('[data-scroller]');
+  const elPedido = container.querySelector('[data-pedido]');
+  const elAncorar = container.querySelector('[data-ancorar]');
+  const elTreina = container.querySelector('[data-treina]');
+  const elCabeca = container.querySelector('[data-cabeca]');
   const elMedida = container.querySelector('[data-medida]');
   const elLeitura = container.querySelector('[data-leitura]');
   const elVeredito = container.querySelector('[data-veredito]');
   const elSeletor = container.querySelector('[data-seletor]');
+  const elEncaixe = container.querySelector('[data-encaixe]');
 
-  let mmPx = 3;
-  let xA = 60;
-  let xB = 120;
-  let verdade = null;   // valores REAIS do traçado exibido, em ms
-  let geometria = null; // para posicionar os marcadores nos marcos certos
+  /* ------------------------------------------------------------ geometria -- */
 
-  /**
-   * Extrai os valores verdadeiros do ritmo renderizado.
-   *
-   * Isto substitui uma tabela de valores fixos que existia antes e que era
-   * simplesmente uma mentira: o app "corrigia" a medida do aluno contra um
-   * número que não pertencia ao traçado na tela. Num app cujo objetivo é
-   * ensinar a medir, é o pior defeito possível.
-   */
-  function extrairVerdade(ritmo) {
-    const ev = ritmo.eventos.find((e) => !e.bloqueada && e.modelo.marcos.inicioQRS != null);
-    if (!ev) return null;
-    const m = ev.modelo.marcos;
-    const temP = m.inicioP != null;
-    const rr = ritmo.rr || (ritmo.eventos[1] ? ritmo.eventos[1].t0 - ritmo.eventos[0].t0 : null);
-    return {
-      pr: temP ? Math.round(m.inicioQRS - m.inicioP) : null,
-      qrs: Math.round(m.durQRS),
-      qt: Math.round(m.qt),
-      rr: rr ? Math.round(rr) : null,
-      // instantes absolutos, para ancorar os marcadores no lugar certo
-      t0: ev.t0,
-      marcos: m,
-    };
+  const xDeT = (t) => offsetX + t * pxPorMs;
+  const passoGrade = () => mmPx * 0.5;
+
+  const grudar = (x) => {
+    if (!encaixar) return x;
+    const p = passoGrade();
+    return offsetX + Math.round((x - offsetX) / p) * p;
+  };
+
+  const limitar = (x) => Math.max(0, Math.min(larguraPalco || 1e5, x));
+
+  /* -------------------------------------------------------------- traçado -- */
+
+  function escolherTracado() {
+    const disponiveis = TRACADOS_PAQ.filter((k) => (!padroes || padroes[k]) && k !== chaveAtual);
+    const ordem = disponiveis.sort(() => Math.random() - 0.5);
+
+    for (const chave of ordem) {
+      try {
+        const r = montarRitmo(chave);
+        r.duracao = Math.min(r.duracao, DURACAO_PAQ);
+        const anc = extrairAncoras(r, tarefa.id);
+        if (anc) {
+          ritmo = r;
+          chaveAtual = chave;
+          derivacao = (padroes && padroes[chave] && padroes[chave].derivacao) || 'DII';
+          verdade = anc;
+          return true;
+        }
+      } catch {
+        /* padrão indisponível neste ambiente: tenta o próximo */
+      }
+    }
+
+    // Rede de segurança: um ritmo sinusal montado aqui mesmo, para a ferramenta
+    // nunca abrir quebrada se a biblioteca não estiver acessível.
+    const r = ritmoRegular({ fc: 72, duracao: DURACAO_PAQ });
+    const anc = extrairAncoras(r, tarefa.id);
+    ritmo = r;
+    chaveAtual = null;
+    derivacao = 'DII';
+    verdade = anc;
+    return Boolean(anc);
   }
 
-  function desenharTracado() {
-    mmPx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mm')) || 3;
-    const ritmo = montarRitmo
-      ? montarRitmo(padraoChave)
-      : ritmoRegular({ fc: 72, duracao: 5000 });
-    verdade = extrairVerdade(ritmo);
-    geometria = { pxPorMs: (PAPEL.velocidade / 1000) * mmPx, offsetX: 10 * mmPx };
+  /** O mesmo traçado continua; só as âncoras mudam porque a tarefa mudou. */
+  function reancorar() {
+    if (!ritmo) return false;
+    const anc = extrairAncoras(ritmo, tarefa.id);
+    if (!anc) return escolherTracado();
+    verdade = anc;
+    return true;
+  }
 
-    elPalco.innerHTML =
-      renderizarTira(ritmo, { estilo: 'papel', mmPx, derivacao: 'DII', id: 'paq' }) +
-      `<div class="paq-faixa" data-faixa></div>
-       <div class="paq-marcador" data-marcador="A" data-rotulo="A" tabindex="0" role="slider"
-            aria-label="Marcador A" aria-valuemin="0" aria-valuenow="0" aria-valuemax="100"></div>
-       <div class="paq-marcador" data-marcador="B" data-rotulo="B" tabindex="0" role="slider"
-            aria-label="Marcador B" aria-valuemin="0" aria-valuenow="0" aria-valuemax="100"></div>`;
+  function pousarMarcadores() {
+    if (!verdade) return;
+    // Deslocamento proposital: perto do lugar certo, nunca em cima dele. Entre
+    // um e um quadradinho e meio, para cada lado sorteado de forma
+    // independente. Deslocar sempre os dois para fora daria uma medida errada
+    // com viés fixo, e o aluno aprenderia a compensar o viés em vez de
+    // aprender a ancorar.
+    const sorteio = () => (Math.random() < 0.5 ? -1 : 1) * mmPx * (0.75 + Math.random() * 0.5);
+    const a = xDeT(verdade.tDe) + sorteio();
+    const b = xDeT(verdade.tAte) + sorteio();
+    // Nunca cruzados: marcador do fim antes do marcador do começo confunde
+    // mais do que ensina.
+    xDe = limitar(Math.min(a, b));
+    xAte = limitar(Math.max(a, b));
+  }
+
+  /**
+   * Traz o trecho a medir para dentro da janela de rolagem.
+   *
+   * A 375 px a tira tem o dobro da largura do scroller, e um RR de 20 mm cai
+   * fora dela. Abrir com o segundo marcador escondido é a mesma falha de
+   * "ferramenta que não diz o que fazer", só que geográfica.
+   */
+  function centralizar() {
+    if (!elScroller || elScroller.scrollWidth <= elScroller.clientWidth) return;
+    const centro = (xDe + xAte) / 2;
+    // Salto seco, não rolagem animada: o traçado inteiro acabou de ser
+    // redesenhado, e o `scroll-snap-type` do .ecg-scroller cancela uma rolagem
+    // suave no meio do caminho e devolve a tira ao começo.
+    elScroller.scrollLeft = Math.max(0, centro - elScroller.clientWidth / 2);
+  }
+
+  function desenhar() {
+    const base = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mm')) || 3;
+    mmPx = base * ZOOM_PAQ;
+    offsetX = 10 * mmPx;                       // margem do pulso de calibração
+    pxPorMs = (PAPEL.velocidade / 1000) * mmPx;
+
+    const svg = renderizarTira(ritmo, {
+      estilo: 'papel', mmPx, alturaMm: 38, derivacao, id: 'paq',
+    });
+
+    elPalco.innerHTML = `${svg}
+      <div class="paq-faixa" data-faixa><span class="paq-conta" data-conta></span></div>
+      <div class="paq-gabarito" data-gabarito="de" hidden><span>certo</span></div>
+      <div class="paq-gabarito" data-gabarito="ate" hidden><span>certo</span></div>
+      <div class="paq-marcador" data-marcador="de" tabindex="0" role="slider"
+           aria-valuemin="0" aria-valuenow="0" aria-valuemax="100">
+        <span class="paq-chip" data-chip="de"></span>
+      </div>
+      <div class="paq-marcador" data-marcador="ate" tabindex="0" role="slider"
+           aria-valuemin="0" aria-valuenow="0" aria-valuemax="100">
+        <span class="paq-chip" data-chip="ate"></span>
+      </div>`;
+
+    const svgEl = elPalco.querySelector('svg');
+    larguraPalco = svgEl ? Number(svgEl.getAttribute('width')) : elPalco.clientWidth;
 
     ligarArraste();
+    pintarTarefa();
     posicionar();
   }
 
-  function posicionar() {
-    const a = container.querySelector('[data-marcador="A"]');
-    const b = container.querySelector('[data-marcador="B"]');
-    const faixa = container.querySelector('[data-faixa]');
-    if (!a || !b) return;
-    a.style.left = `${xA}px`;
-    b.style.left = `${xB}px`;
-    faixa.style.left = `${Math.min(xA, xB)}px`;
-    faixa.style.width = `${Math.abs(xB - xA)}px`;
-    atualizarLeitura();
+  /* ---------------------------------------------------------------- texto -- */
+
+  function pintarTarefa() {
+    elPedido.innerHTML = `<strong>Sua tarefa:</strong> meça ${tarefa.artigo} ${escapar(tarefa.nome)} deste traçado.`;
+    elAncorar.innerHTML = `Marcador <em>${escapar(tarefa.de)}</em> no começo, marcador <em>${escapar(tarefa.ate)}</em> no fim. ${escapar(tarefa.ancorar)}`;
+    elTreina.textContent = `O que isto treina: ${tarefa.treina} Acerto é ficar a até ${tarefa.tolerancia} ms do valor real, ou seja ${(tarefa.tolerancia / 40).toFixed(1).replace('.', ',')} mm no papel.`;
+    elCabeca.textContent = `tira de ritmo · ${derivacao}`;
+
+    const chipDe = container.querySelector('[data-chip="de"]');
+    const chipAte = container.querySelector('[data-chip="ate"]');
+    if (chipDe) chipDe.textContent = tarefa.de;
+    if (chipAte) chipAte.textContent = tarefa.ate;
+
+    const marcDe = container.querySelector('[data-marcador="de"]');
+    const marcAte = container.querySelector('[data-marcador="ate"]');
+    if (marcDe) marcDe.setAttribute('aria-label', `Marcador do ${tarefa.de}`);
+    if (marcAte) marcAte.setAttribute('aria-label', `Marcador do ${tarefa.ate}`);
+
+    if (elSeletor.value !== tarefa.id) elSeletor.value = tarefa.id;
   }
 
-  function atualizarLeitura() {
-    const dxPx = Math.abs(xB - xA);
-    const mm = dxPx / mmPx;
+  function posicionar() {
+    const a = container.querySelector('[data-marcador="de"]');
+    const b = container.querySelector('[data-marcador="ate"]');
+    const faixa = container.querySelector('[data-faixa]');
+    if (!a || !b || !faixa) return;
+
+    a.style.left = `${xDe}px`;
+    b.style.left = `${xAte}px`;
+    faixa.style.left = `${Math.min(xDe, xAte)}px`;
+    faixa.style.width = `${Math.abs(xAte - xDe)}px`;
+
+    const mm = Math.abs(xAte - xDe) / mmPx;
+    a.setAttribute('aria-valuetext', `${(xDe / mmPx).toFixed(1).replace('.', ',')} mm`);
+    b.setAttribute('aria-valuetext', `${(xAte / mmPx).toFixed(1).replace('.', ',')} mm`);
+
+    atualizarLeitura(mm);
+  }
+
+  function atualizarLeitura(mm) {
     const ms = Math.round(mmParaMs(mm));
+    const quadradinhos = mm;                 // 1 mm = 1 quadradinho
     const quadradoes = mm / 5;
+
+    const conta = container.querySelector('[data-conta]');
+    if (conta) conta.textContent = `${quadradinhos.toFixed(1).replace('.', ',')} quadradinhos`;
 
     elMedida.textContent = `${mm.toFixed(1).replace('.', ',')} mm · ${ms} ms · ${quadradoes.toFixed(1).replace('.', ',')} quadradões`;
 
-    const m = MEDIDAS[medida];
     let texto;
     let status;
-    if (ms < m.min) { texto = m.baixo; status = 'alterado'; }
-    else if (ms > m.max) { texto = m.alto; status = 'alterado'; }
-    else { texto = m.normal; status = 'normal'; }
+    if (ms < tarefa.min) { texto = tarefa.baixo; status = 'alterado'; }
+    else if (ms > tarefa.max) { texto = tarefa.alto; status = 'alterado'; }
+    else { texto = tarefa.normal; status = 'normal'; }
 
-    if (medida === 'rr') {
+    if (tarefa.id === 'rr' && ms > 0) {
       const fc = fcDeRR(ms);
-      texto = `${texto} Frequência derivada: ${fc} bpm. Pelas contas de bolso: 1500 ÷ ${(mm).toFixed(0)} quadradinhos, ou 300 ÷ ${quadradoes.toFixed(1)} quadradões. Nenhuma das duas vale se o ritmo for irregular. Aí conte os QRS em 6 segundos e multiplique por 10.`;
+      texto = `${texto} Frequência derivada: ${fc} bpm. Pelas contas de bolso, 1500 ÷ ${quadradinhos.toFixed(0)} quadradinhos, ou 300 ÷ ${quadradoes.toFixed(1).replace('.', ',')} quadradões. Nenhuma das duas vale se o ritmo for irregular: aí conte os QRS em 6 segundos e multiplique por 10.`;
     }
-    if (medida === 'qt') {
-      texto += ` Bazett com RR de 860 ms daria QTc ≈ ${qtcBazett(ms, 860)} ms; Fridericia, ≈ ${qtcFridericia(ms, 860)} ms.`;
+    if (tarefa.id === 'qt') {
+      const rr = ritmo && ritmo.rr ? Math.round(ritmo.rr) : null;
+      texto = rr
+        ? `${texto} Neste traçado o RR é de ${rr} ms, então Bazett daria QTc de cerca de ${qtcBazett(ms, rr)} ms e Fridericia, cerca de ${qtcFridericia(ms, rr)} ms.`
+        : `${texto} Para corrigir, você precisa do RR deste mesmo traçado.`;
     }
 
     elLeitura.textContent = texto;
     elLeitura.dataset.status = status;
-
-    if (modoAferido && alvo) avaliarAfericao(ms);
   }
 
-  function avaliarAfericao(msMedido) {
-    const erro = Math.abs(msMedido - alvo.valor);
-    const tolerancia = 20; // ms — meia divisão do papel, que é o que o olho resolve
-    const ok = erro <= tolerancia;
-    elVeredito.innerHTML = `
-      <div class="nota ${ok ? 'nota--ok' : 'nota--atencao'}">
-        <div class="nota-titulo">${ok ? 'Medida correta' : 'Fora da tolerância'}</div>
-        Você mediu <strong>${msMedido} ms</strong>. O valor real é <strong>${alvo.valor} ms</strong>
-        (diferença de ${erro} ms; a tolerância é ${tolerancia} ms, cerca de meia divisão do papel).
-        ${ok ? '' : ' Confira se você ancorou o marcador no <em>início</em> da onda e não no pico.'}
-      </div>`;
-  }
+  /* -------------------------------------------------------------- arrasto -- */
 
   function ligarArraste() {
     for (const el of container.querySelectorAll('[data-marcador]')) {
@@ -679,73 +979,157 @@ export function criarPaquimetro(container, { padraoChave = 'normal', montarRitmo
       el.addEventListener('pointermove', (ev) => {
         if (!el.hasPointerCapture(ev.pointerId)) return;
         const caixa = elPalco.getBoundingClientRect();
-        const x = Math.max(0, Math.min(caixa.width, ev.clientX - caixa.left));
-        if (qual === 'A') xA = x; else xB = x;
+        const x = grudar(limitar(ev.clientX - caixa.left));
+        if (qual === 'de') xDe = x; else xAte = x;
         posicionar();
       });
 
-      el.addEventListener('pointerup', (ev) => el.releasePointerCapture(ev.pointerId));
+      el.addEventListener('pointerup', (ev) => {
+        if (el.hasPointerCapture(ev.pointerId)) el.releasePointerCapture(ev.pointerId);
+      });
 
-      // Teclado: cada passo é um quadradinho; com Shift, um quadradão.
       el.addEventListener('keydown', (ev) => {
-        const passo = ev.shiftKey ? mmPx * 5 : mmPx;
+        const passo = ev.shiftKey ? passoGrade() * 10 : passoGrade();
         let d = 0;
         if (ev.key === 'ArrowLeft') d = -passo;
         else if (ev.key === 'ArrowRight') d = passo;
         else return;
         ev.preventDefault();
-        if (qual === 'A') xA = Math.max(0, xA + d); else xB = Math.max(0, xB + d);
+        if (qual === 'de') xDe = grudar(limitar(xDe + d)); else xAte = grudar(limitar(xAte + d));
         posicionar();
       });
     }
   }
 
+  /* ------------------------------------------------------------- correção -- */
+
+  function mostrarGabarito() {
+    const g1 = container.querySelector('[data-gabarito="de"]');
+    const g2 = container.querySelector('[data-gabarito="ate"]');
+    if (!g1 || !g2 || !verdade) return;
+    g1.style.left = `${xDeT(verdade.tDe)}px`;
+    g2.style.left = `${xDeT(verdade.tAte)}px`;
+    g1.hidden = false;
+    g2.hidden = false;
+  }
+
+  function esconderGabarito() {
+    for (const g of container.querySelectorAll('[data-gabarito]')) g.hidden = true;
+  }
+
+  function conferir() {
+    if (!verdade) return;
+    const mm = Math.abs(xAte - xDe) / mmPx;
+    const medido = Math.round(mmParaMs(mm));
+    const erro = Math.abs(medido - verdade.valor);
+    const ok = erro <= tarefa.tolerancia;
+    conferido = true;
+    mostrarGabarito();
+
+    // Onde exatamente o aluno errou. Dizer "errou 60 ms" sem dizer em qual
+    // ponta não ensina a corrigir o gesto.
+    const desvioDe = Math.round((xDe - xDeT(verdade.tDe)) / pxPorMs);
+    const desvioAte = Math.round((xAte - xDeT(verdade.tAte)) / pxPorMs);
+    const lado = (d, nome) => {
+      if (Math.abs(d) <= 10) return `o marcador do ${nome} estava no lugar`;
+      return `o marcador do ${nome} estava ${Math.abs(d)} ms ${d > 0 ? 'à direita' : 'à esquerda'} do ponto certo`;
+    };
+
+    const nomeTracado = chaveAtual && padroes && padroes[chaveAtual] ? padroes[chaveAtual].nome : null;
+
+    /* Os dois marcadores fora do lugar, para o mesmo lado, devolvem a distância
+       certa entre pontos errados. O número passa e o gesto continua errado, e
+       no traçado seguinte ele não passa mais. Vale dizer isso em voz alta. */
+    const compensou = ok
+      && Math.abs(desvioDe) > 20 && Math.abs(desvioAte) > 20
+      && Math.sign(desvioDe) === Math.sign(desvioAte);
+
+    elVeredito.innerHTML = `
+      <div class="nota ${ok ? 'nota--ok' : 'nota--atencao'}">
+        <div class="nota-titulo">${ok ? 'Dentro da tolerância' : 'Fora da tolerância'}</div>
+        <p>Você mediu <strong>${medido} ms</strong>. ${tarefa.artigo === 'a' ? 'A' : 'O'} ${escapar(tarefa.nome)} real deste traçado é
+        <strong>${verdade.valor} ms</strong>: diferença de ${erro} ms, para uma tolerância de
+        ${tarefa.tolerancia} ms.</p>
+        <p>As duas linhas tracejadas sobre o papel mostram onde a medida realmente começa e termina.
+        Conferindo ponta por ponta, ${lado(desvioDe, escapar(tarefa.de))} e ${lado(desvioAte, escapar(tarefa.ate))}.</p>
+        ${compensou ? '<p>Repare que a medida passou por compensação: os dois marcadores erraram para o mesmo lado, então a distância entre eles saiu certa entre pontos errados. No próximo traçado esse mesmo gesto não passa.</p>' : ''}
+        ${nomeTracado ? `<p class="miudo">Este traçado é o de <strong>${escapar(nomeTracado)}</strong>, da biblioteca de padrões.</p>` : ''}
+      </div>`;
+  }
+
+  /* --------------------------------------------------------------- ações -- */
+
   elSeletor.addEventListener('change', () => {
-    medida = elSeletor.value;
-    modoAferido = false;
-    alvo = null;
+    const nova = TAREFAS.find((t) => t.id === elSeletor.value);
+    if (!nova) return;
+    tarefa = nova;
+    conferido = false;
     elVeredito.innerHTML = '';
-    atualizarLeitura();
+    esconderGabarito();
+    reancorar();
+    desenhar();
+    pousarMarcadores();
+    posicionar();
+    centralizar();
   });
 
-  const ANCORAS = {
-    pr:  'do <strong>início da onda P</strong> ao <strong>início do QRS</strong>, não ao pico do R',
-    qrs: 'do <strong>início</strong> ao <strong>fim do complexo</strong>, onde ele volta à linha de base',
-    qt:  'do <strong>início do QRS</strong> ao <strong>fim da onda T</strong>, onde ela reencontra a linha de base',
-    rr:  'de um <strong>pico R</strong> ao <strong>pico R seguinte</strong>',
-  };
+  elEncaixe.addEventListener('change', () => {
+    encaixar = elEncaixe.checked;
+    xDe = grudar(xDe);
+    xAte = grudar(xAte);
+    posicionar();
+  });
 
-  container.querySelector('[data-aferir]').addEventListener('click', () => {
-    const m = MEDIDAS[medida];
-    const real = verdade ? verdade[medida] : null;
+  container.querySelector('[data-conferir]').addEventListener('click', conferir);
 
-    if (real == null) {
-      elVeredito.innerHTML = `<div class="nota nota--atencao">
-        <div class="nota-titulo">Não dá para aferir aqui</div>
-        Este traçado não tem ${m.nome.toLowerCase()} mensurável, por exemplo, não há onda P para
-        medir o PR. Escolha outra medida ou outro traçado.</div>`;
-      modoAferido = false;
-      alvo = null;
-      return;
+  container.querySelector('[data-mostrar]').addEventListener('click', () => {
+    mostrarGabarito();
+    if (!conferido) {
+      elVeredito.innerHTML = `<div class="nota nota--info">
+        <div class="nota-titulo">Gabarito à mostra</div>
+        As duas linhas tracejadas marcam onde a medida começa e onde termina. Encoste os marcadores
+        nelas para gravar o gesto, depois peça outra medida e faça sem olhar.</div>`;
     }
-
-    modoAferido = true;
-    alvo = { valor: real };
-    elVeredito.innerHTML = `<div class="nota nota--info">
-      <div class="nota-titulo">Medida solicitada</div>
-      Meça o <strong>${m.nome.toLowerCase()}</strong> deste traçado. Ancore ${ANCORAS[medida]}.
-      A correção aparece sozinha assim que você posicionar os dois marcadores.</div>`;
-    atualizarLeitura();
   });
 
-  container.querySelector('[data-outro-tracado]').addEventListener('click', () => {
+  container.querySelector('[data-proxima]').addEventListener('click', () => {
+    // Avança a tarefa e troca o traçado: medir sempre a mesma coisa no mesmo
+    // papel vira memória de posição, não habilidade de medir.
+    const i = TAREFAS.indexOf(tarefa);
+    tarefa = TAREFAS[(i + 1) % TAREFAS.length];
+    conferido = false;
     elVeredito.innerHTML = '';
-    modoAferido = false;
-    desenharTracado();
+    escolherTracado();
+    desenhar();
+    pousarMarcadores();
+    posicionar();
+    centralizar();
   });
 
-  desenharTracado();
-  window.addEventListener('resize', () => desenharTracado(), { passive: true });
+  /* ---------------------------------------------------------------- vida -- */
 
-  return { desenharTracado };
+  escolherTracado();
+  desenhar();
+  pousarMarcadores();
+  posicionar();
+  centralizar();
+
+  /* Redesenhar a cada resize apagaria a medida em curso a cada vez que a barra
+     de endereço do celular some. Só interessa a mudança de escala do papel, e
+     só enquanto esta ferramenta continuar na tela. */
+  let mmAnterior = mmPx;
+  window.addEventListener('resize', () => {
+    if (!container.isConnected) return;
+    const base = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mm')) || 3;
+    if (Math.abs(base * ZOOM_PAQ - mmAnterior) < 0.01) return;
+    mmAnterior = base * ZOOM_PAQ;
+    conferido = false;
+    elVeredito.innerHTML = '';
+    desenhar();
+    pousarMarcadores();
+    posicionar();
+    centralizar();
+  }, { passive: true });
+
+  return { desenhar };
 }

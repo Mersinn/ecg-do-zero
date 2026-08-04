@@ -187,6 +187,7 @@ export const BATIMENTO_PADRAO = {
   pAssim: 0.1,
   pBifida: false, // entalhe de sobrecarga atrial esquerda
   pr: 160, // ms  — início da P ao início do QRS (normal 120–200)
+  prDesnivel: 0, // mV  — desvio do SEGMENTO PR (negativo = deprimido, pericardite)
   qrs: 'normal', // chave de QRS
   qrsEscala: 1, // multiplicador de amplitude
   qrsLargura: 1, // multiplicador de duração
@@ -243,7 +244,17 @@ export function construirBatimento(cfg = {}) {
       }
     }
 
-    // Segmento PR: isoelétrico por definição. Nada a somar.
+    // Segmento PR: isoelétrico no traçado normal, e por isso `prDesnivel` é 0
+    // por padrão. Ele existe porque a pericardite deprime ESTE segmento, e o app
+    // manda o aluno procurar a depressão na tira: sem desenhá-la, o texto
+    // afirmaria sobre o traçado algo que o traçado não mostra. O desvio começa
+    // no fim da onda P e sobe de volta à linha de base ao chegar no QRS, que é
+    // como ele aparece no papel.
+    if (temP && p.prDesnivel !== 0 && t > fimP && t < inicioQRS) {
+      const janela = inicioQRS - fimP;
+      const f = (t - fimP) / janela;
+      v += p.prDesnivel * Math.min(1, f / 0.25) * Math.min(1, (1 - f) / 0.15);
+    }
 
     if (t >= inicioQRS && t <= fimQRS) {
       v += poligonal(t - inicioQRS, forma);

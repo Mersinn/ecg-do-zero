@@ -139,7 +139,7 @@ export const PADROES = {
     pivo: 'Taquicardia com onda P sinusal visível e início/fim graduais.',
     conduta: 'É sintoma, não diagnóstico. Trate a causa.',
     distrator: 'TSV — que tem início e término súbitos e frequência tipicamente mais alta e fixa.',
-    pegadinha: 'Taquicardia sinusal raramente ultrapassa 220 − idade. Acima disso, pense em outra taquiarritmia.',
+    pegadinha: 'Taquicardia sinusal tem teto: o manual de suporte avançado registra que ela não excede 220 por minuto e que o limite cai com a idade. Frequência acima do esperado para a idade do paciente aponta outra taquiarritmia. A conta de bolso "220 menos a idade" é só uma estimativa grosseira do máximo, não um critério de diretriz.',
     alternativas: ['Taquicardia supraventricular', 'Flutter atrial 2:1', 'Taquicardia atrial'],
   },
 
@@ -285,14 +285,17 @@ export const PADROES = {
     familia: 'bav',
     nivel: 'avancado',
     derivacao: 'DII',
-    ritmo: () => ritmoMobitz2({ fc: 76, duracao: 7500, pr: 180, razao: 3 }),
+    // QRS largo de propósito: o Mobitz II é predominantemente infranodal, e o
+    // roteiro guiado manda o aluno reparar na largura do complexo. Desenhar um
+    // complexo estreito faria o texto apontar para um achado inexistente na tira.
+    ritmo: () => ritmoMobitz2({ fc: 76, duracao: 7500, pr: 180, razao: 3, batimento: { qrsLargura: 1.45 } }),
     leitura: {
       adequacao: 'Calibração padrão.',
       ritmo: 'Sinusal com bloqueio.',
       fc: 'Atrial regular; ventricular reduzida de forma abrupta a cada falha.',
       eixo: 'Normal ou desviado.',
       intervalos: 'PR FIXO em todos os batimentos conduzidos — e, sem qualquer aviso, um P não conduz.',
-      qrs: 'Pode ser estreito, mas com frequência é largo: o bloqueio é infranodal, no His-Purkinje.',
+      qrs: 'Largo nesta tira, cerca de 130 ms, que é o mais comum: o bloqueio é infranodal, no His-Purkinje. Pode ser estreito, e aí a lesão é intra-hissiana, mas essa é a minoria.',
       st: 'Sem alteração primária.',
       sintese: 'PR constante com falha súbita de condução — bloqueio infranodal.',
       conduta: 'Marcapasso. Se instável: marcapasso transcutâneo imediato. Atropina é ineficaz e pode piorar, porque acelera o átrio sem melhorar a condução infranodal.',
@@ -452,6 +455,7 @@ export const PADROES = {
     conduta: 'A decisão que mais muda prognóstico é a anticoagulação, não a frequência.',
     distrator: 'Flutter com condução variável, que também é irregular mas tem ondas F organizadas.',
     pegadinha: 'FA com mais de 48 h, ou de início indeterminado, exige anticoagulação adequada ou ecocardiograma transesofágico ANTES da cardioversão eletiva. Cardioverter direto é risco de embolia.',
+    alerta: 'DIVERGÊNCIA DE FONTES, com a referência por extenso. O limiar clássico de duração para cardioversão eletiva sem preparo é de 48 h. As Diretrizes de 2024 para o manejo da fibrilação atrial da Sociedade Europeia de Cardiologia, elaboradas com a Associação Europeia de Cirurgia Cardiotorácica e publicadas no European Heart Journal (2024 ESC/EACTS Guidelines for the management of atrial fibrillation), baixaram esse limiar para 24 h. Nas duas convenções, a anticoagulação segue por pelo menos 4 semanas depois da cardioversão.',
     alternativas: ['Flutter atrial', 'Taquicardia atrial multifocal', 'Taquicardia sinusal com extrassístoles'],
   },
 
@@ -697,7 +701,12 @@ export const PADROES = {
     derivacao: 'DII',
     ritmo: () => ritmoRegular({
       fc: 96, duracao: 5500,
-      batimento: { st: 0.16, stForma: 'concavo', stDur: 100, tAmp: 0.3, tDur: 190, pAmp: 0.13 },
+      batimento: {
+        st: 0.16, stForma: 'concavo', stDur: 100, tAmp: 0.3, tDur: 190, pAmp: 0.13,
+        // Infra do SEGMENTO PR: o segundo discriminador contra oclusão, e o
+        // roteiro guiado pede para medi-lo nesta tira.
+        prDesnivel: -0.08,
+      },
     }),
     leitura: {
       adequacao: 'Calibração padrão.',

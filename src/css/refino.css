@@ -139,31 +139,53 @@
    manda a regra do projeto.
    ========================================================================== */
 @layer base {
+  /* A escada usa QUATRO recursos, nesta ordem de importância: peso, cor,
+     espaço e só então tamanho. Os pesos são os do sistema (400/500/600/700):
+     pedir 620 ou 660, como antes, faz o navegador arredondar tudo para o
+     mesmo desenho, e aí só sobra o tamanho para diferenciar. Era esse o
+     defeito.
+
+       h1  700  tinta     t-4   caixa própria, nunca mais de 3 linhas
+       h2  700  tinta     t-3   abre seção, com filete acima
+       h3  600  tinta     t-1   subordinado, mas ainda acima do corpo
+       h4  600  tinta-2   t-0   rótulo de item, mesmo tamanho do corpo
+       p   400  tinta-2   t-0
+  */
   h1 {
     font-size: var(--t-4);
-    font-weight: 700;
-    letter-spacing: -0.042em;
-    line-height: 1.02;
+    font-weight: var(--p-forte);
+    letter-spacing: -0.032em;
+    line-height: 1.03;
     color: var(--tinta);
+    /* CAIXA PRÓPRIA. Sem isto o h1 herdava a medida do texto corrido
+       (68ch medidos no corpo, cerca de 590 px) e, com 46 px de corpo, cabiam
+       25 caracteres por linha: o título de tela quebrava em quatro linhas em
+       1440 px. Com 24ch medidos NO PRÓPRIO h1 a caixa acompanha o tamanho da
+       fonte, e o título mais longo do app, "Pré-excitação (Wolff-Parkinson-
+       White)", com 37 caracteres, fecha em 2 linhas nos três alvos. */
+    max-width: var(--medida-titulo);
+    text-wrap: balance;
   }
   h2 {
     font-size: var(--t-3);
-    font-weight: 620;
-    letter-spacing: -0.028em;
-    line-height: 1.12;
+    font-weight: var(--p-forte);
+    letter-spacing: -0.024em;
+    line-height: 1.13;
     color: var(--tinta);
+    max-width: 30ch;
   }
   h3 {
     font-family: var(--ff-titulo);
     font-size: var(--t-1);
-    font-weight: 700;
-    letter-spacing: -0.008em;
+    font-weight: var(--p-semi);
+    letter-spacing: -0.006em;
     line-height: 1.3;
     color: var(--tinta);
+    max-width: 42ch;
   }
   h4 {
     font-size: var(--t-0);
-    font-weight: 700;
+    font-weight: var(--p-semi);
     letter-spacing: 0;
     color: var(--tinta-2);
   }
@@ -174,7 +196,7 @@
   h1 + p {
     font-size: var(--t-2);
     line-height: 1.44;
-    font-weight: 400;
+    font-weight: var(--p-normal);
     letter-spacing: -0.012em;
     color: var(--tinta-2);
     max-width: 46ch;
@@ -183,7 +205,7 @@
   h2 + p {
     font-size: var(--t-1);
     line-height: 1.5;
-    font-weight: 400;
+    font-weight: var(--p-normal);
     letter-spacing: -0.006em;
     color: var(--tinta-2);
     max-width: 54ch;
@@ -204,7 +226,7 @@
      Cada seção nova abre com filete e ar, em vez de mais um cartão. Isto
      também é o que substitui o rótulo em caixa alta que havia em cada bloco. */
   #vista section > h2:first-child {
-    padding-top: var(--e-5);
+    padding-top: var(--ritmo-bloco);
     border-top: 1px solid var(--linha);
   }
   #vista > * > section:first-child > h2:first-child,
@@ -215,11 +237,15 @@
   #vista h3 { margin-top: var(--e-5); }
   #vista :is(h3:first-child, .cartao-titulo, .anat-explica h4) { margin-top: 0; }
 
-  /* Distância entre seções de primeiro nível. Sem isto, seção e subseção
-     ficam à mesma distância e a página vira uma pilha uniforme. */
-  @media (min-width: 48rem) {
-    #vista .empilha-g > * + * { margin-top: var(--e-7); }
-  }
+  /* RITMO VERTICAL. Três distâncias, cada uma com um significado, em vez de
+     um vão genérico repetido:
+       --ritmo-interno  entre irmãos dentro de um bloco   (.empilha)
+       --ritmo-bloco    entre blocos dentro de uma seção  (.bloco, h2)
+       --ritmo-secao    entre seções de primeiro nível    (.empilha-g)
+     Os três crescem por breakpoint (ver tokens em app.css): em 1440 px o vão
+     que separa no celular não separa mais nada. */
+  #vista .empilha > * + * { margin-top: var(--ritmo-interno); }
+  #vista .empilha-g > * + * { margin-top: var(--ritmo-secao); }
 }
 
 @layer componentes {
@@ -498,65 +524,108 @@
 
 /* ==========================================================================
    BLOCO 5 . LOGO
-   DEFEITO: retângulo vermelho com um traçado branco dentro, ao lado do nome.
-   Caixa colorida em cabeçalho fixo é a coisa mais parecida com "logo de
-   template" que existe, e a 24 px o traço dentro da caixa some.
+   --------------------------------------------------------------------------
+   HISTÓRICO. A primeira versão era um retângulo vermelho com um traçado
+   branco dentro. Caixa colorida em cabeçalho fixo é o que mais parece "logo
+   de template", e a 24 px o traço dentro da caixa sumia. A segunda versão
+   tirou a caixa e deixou só o traço, o que foi a decisão certa, mas o
+   DESENHO ficou errado em três pontos:
 
-   CORREÇÃO: o mark passa a ser UM traço de ECG, sem fundo, herdando a cor
-   por currentColor (bordô clínico no cabeçalho, tinta em contexto neutro).
-   O desenho tem quatro eventos reconhecíveis: linha de base, onda P
-   arredondada, QRS com q, R alta e volta, e onda T em cúpula. Em 24 px de
-   altura sobram o R e a cúpula da T, que é o que precisa sobrar.
+     1. proporção. A onda P tinha 4 unidades de altura contra 11 do R. Num
+        ECG a P fica perto de um quinto do R. Com 4 para 11 a marca lia como
+        duas corcovas e um pico, não como um batimento.
+     2. ritmo. Havia 9,4 unidades de linha de base antes da P e 2 depois da
+        T: a marca era pesada à esquerda e cortada à direita.
+     3. o QRS não tinha S. Subia, batia no pico e voltava direto para a
+        linha. É a parte do sinal que qualquer aluno reconhece, e era
+        justamente a que faltava.
 
-   COLE ISTO NO index.html, no lugar do <svg> atual dentro de <div class="marca">:
+   DESENHO ATUAL. Um ciclo completo em 40 por 24, com a linha de base em 14,5
+   e o centro óptico da marca no meio vertical da caixa:
 
-   <svg class="marca-mark" viewBox="0 0 44 24" height="22" role="img"
-        aria-label="ECG Ultimate Learning" focusable="false">
-     <path d="M2 15h9.4q2.5-4 5 0h2.4l1.2 3L23.8 4L26 15h3c1.6 0 2.2-5.6 4.4-5.6s2.8 5.6 4.4 5.6H42"
-           fill="none" stroke="currentColor" stroke-width="2.2"
-           stroke-linecap="round" stroke-linejoin="round"/>
-   </svg>
+     entrada 7 un.   P (altura 2,6)   PR 2,6 un.
+     q (3,2)   R (10,6)   S (5,6)
+     ST 2,8 un.   T (altura 3,4)   saída 3,6 un.
 
-   E o favicon equivalente, sem a caixa vermelha, no <link rel="icon">:
+   As proporções são as do sinal: P menor que T, T menor que S, S menor que
+   R, e o QRS ocupando cerca de um terço da largura do ciclo. Em 22 px de
+   altura o traço fica com 2,2 px, que é o peso em que a marca ainda tem
+   corpo sem borrar o vale do S.
 
-   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 24'%3E%3Cpath d='M2 15h9.4q2.5-4 5 0h2.4l1.2 3L23.8 4L26 15h3c1.6 0 2.2-5.6 4.4-5.6s2.8 5.6 4.4 5.6H42' fill='none' stroke='%23c2352b' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+   COR. O traço é grafite e SÓ o QRS é vermelho. É a assinatura do objeto: o
+   pico é a única coisa que todo mundo reconhece num ECG, e o acento cai
+   exatamente ali em vez de tingir a marca inteira. São dois path
+   sobrepostos, com o do QRS desenhado por cima.
+
+   O index.html precisa ter os dois path com as classes .marca-traco e
+   .marca-pico. O bloco de rede de segurança no fim desta seção mantém a
+   marca visível caso o markup ainda seja o antigo.
    ========================================================================== */
 @layer layout {
-  .marca { gap: var(--e-3); align-items: center; }
+  .marca { gap: var(--e-3); align-items: center; min-width: 0; }
 
   .marca-mark {
     flex: 0 0 auto;
     height: 22px;
     width: auto;
-    color: var(--acento);
+    color: var(--acento);   /* rede: se a pintura por classe falhar, currentColor */
     overflow: visible;
   }
-  @media (min-width: 48rem) { .marca-mark { height: 26px; } }
+  @media (min-width: 48rem) { .marca-mark { height: 25px; } }
 
-  /* Lockup: o nome encosta mais no mark e ganha o peso que o mark não tem.
-     O antigo retângulo competia com o nome; o traço apoia o nome. */
+  /* A pintura mora aqui, em classe, como todo SVG do projeto. Regra de folha
+     de estilo vence atributo de apresentação, então o stroke="currentColor"
+     que continua no index.html serve de rede de segurança sem brigar. */
+  .marca-traco {
+    fill: none;
+    stroke: var(--tinta-2);
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .marca-pico {
+    fill: none;
+    stroke: var(--acento);
+    stroke-width: 2.4;
+    /* butt, e não round: as pontas do trecho vermelho caem exatamente sobre a
+       linha de base cinza. Com ponta arredondada sobrariam dois cotovelos
+       vermelhos de meia espessura para fora da junta. */
+    stroke-linecap: butt;
+    stroke-linejoin: round;
+  }
+
+  /* LOCKUP. O mark não tem peso tipográfico nenhum, então quem carrega a
+     marca é o nome. Ele fica em 600 com entreletra fechada, e a linha de
+     apoio cai para --tinta-3 em corpo miúdo: dois níveis claros, sem caixa
+     alta espaçada e sem competir com o traço. */
   .marca-nome {
     font-family: var(--ff-titulo);
     font-size: var(--t-1);
-    font-weight: 640;
+    font-weight: var(--p-semi);
     letter-spacing: -0.022em;
-    line-height: 1.15;
+    line-height: 1.14;
     color: var(--tinta);
   }
-  /* Uma caixa alta espaçada a menos no cabeçalho. */
   .marca-sub {
     font-family: var(--ff-corpo);
     font-size: var(--t--2);
+    font-weight: var(--p-normal);
     text-transform: none;
     letter-spacing: 0;
     color: var(--tinta-3);
     line-height: 1.3;
   }
 
-  /* Enquanto o index.html ainda não tiver a classe .marca-mark, o SVG antigo
-     continua funcionando: esta regra só alcança o SVG direto da marca e
-     apenas ajusta o tamanho, sem tentar consertar o retângulo. */
+  /* Rede de segurança para um index.html que ainda esteja no markup antigo:
+     a marca continua visível, do tamanho certo e com o peso de traço certo. */
   .marca > svg:not(.marca-mark) { height: 24px; width: auto; }
+  .marca-mark path:not([class]) {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
 }
 
 /* ==========================================================================
@@ -598,4 +667,522 @@
   .rodape { font-size: var(--t--1); line-height: 1.62; }
   .rodape strong { color: var(--tinta-2); }
   .rodape .prosa { max-width: 62ch; }
+}
+
+/* ==========================================================================
+   BLOCO 7 . PAQUÍMETRO COM TAREFA, E OS NOVE PASSOS COMO EXERCÍCIO
+   Dois relatos do autor, os dois sobre a mesma coisa: a ferramenta existia e
+   não dizia o que fazer com ela. "Não entendi a estrutura e a funcionalidade,
+   mesmo alternando entre A e B" e "esses passos só estão soltos jogados, sem
+   qualquer direção ou intuição". A correção é de conteúdo e de interação, em
+   tools.js e app.js; aqui está só o que ela precisa de forma.
+   ========================================================================== */
+
+@layer ferramentas {
+  /* --- paquímetro: a tarefa vem antes da ferramenta --- */
+  .paq-tarefa {
+    display: grid; gap: var(--e-2);
+    padding: var(--e-4);
+    border: 1px solid var(--acento-borda);
+    border-left: 3px solid var(--acento);
+    border-radius: var(--r-3);
+    background: var(--acento-fraco);
+  }
+  .paq-pedido  { font-size: var(--t-1); line-height: var(--lh-titulo); }
+  .paq-ancorar { font-size: var(--t--1); color: var(--tinta-2); }
+  .paq-treina  { font-size: var(--t--2); color: var(--tinta-3); }
+
+  .paq-opcoes {
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: var(--e-2) var(--e-4);
+  }
+  .paq-opcoes select { flex: 0 1 15rem; min-width: 11rem; }
+  .paq-encaixe {
+    display: inline-flex; align-items: center; gap: var(--e-2);
+    min-height: var(--toque);
+    font-size: var(--t--1); color: var(--tinta-2); cursor: pointer;
+  }
+  .paq-encaixe input {
+    width: 20px; height: 20px; flex: none;
+    accent-color: var(--acento); cursor: pointer;
+  }
+
+  /* O app.css desenha a etiqueta do marcador a partir de data-rotulo, que era
+     onde moravam o "A" e o "B". O rótulo agora é um <span> com o nome do ponto
+     de ancoragem, e sem esta linha sobraria uma pílula azul vazia na tela. */
+  .paq-marcador::after { content: none; }
+
+  .paq-chip {
+    position: absolute; left: 50%; translate: -50% 0;
+    padding: 2px 7px; border-radius: var(--r-pill);
+    font-family: var(--ff-mono); font-size: 10px; font-weight: 700;
+    line-height: 1.4; white-space: nowrap;
+    color: #fff; background: var(--info);
+    box-shadow: 0 0 0 2px var(--ecg-bg);
+    pointer-events: none;
+  }
+  /* Escalonados na vertical: numa medida curta como o QRS os dois marcadores
+     ficam a poucos milímetros um do outro, e dois rótulos na mesma altura
+     viveriam sobrepostos. */
+  .paq-marcador[data-marcador="de"]  .paq-chip { top: 3px; }
+  .paq-marcador[data-marcador="ate"] .paq-chip { top: 28px; }
+  .paq-marcador:focus-visible .paq-chip,
+  .paq-marcador:active .paq-chip { background: var(--acento); }
+
+  /* Contagem em quadradinhos durante o arrasto, sobre a faixa medida. */
+  .paq-faixa { z-index: 1; }
+  .paq-conta {
+    position: absolute; left: 50%; bottom: 4px; translate: -50% 0;
+    padding: 1px 8px; border-radius: var(--r-pill);
+    font-family: var(--ff-mono); font-size: 10px; font-weight: 700;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+    color: var(--info); background: var(--superficie);
+    border: 1px solid var(--info-borda);
+  }
+
+  /* Gabarito: onde a medida realmente começava e terminava. Só aparece depois
+     de conferir, ou quando o aluno pede. */
+  .paq-gabarito {
+    position: absolute; top: 0; bottom: 0; width: 0;
+    border-left: 2px dashed var(--atencao);
+    pointer-events: none; z-index: 2;
+  }
+  .paq-gabarito[hidden] { display: none; }
+  .paq-gabarito > span {
+    position: absolute; bottom: 3px; left: 0; translate: -50% 0;
+    padding: 0 6px; border-radius: var(--r-pill);
+    font-family: var(--ff-mono); font-size: 9px; font-weight: 700;
+    color: var(--atencao); background: var(--superficie);
+    border: 1px solid var(--atencao-borda);
+  }
+}
+
+@layer componentes {
+  /* --- os nove passos: traçado de um lado, passo do outro --- */
+  .metodo-grade { display: grid; gap: var(--e-5); align-items: start; }
+  .metodo-grade > * { min-width: 0; }
+  /* Duas colunas só no desktop. No iPad a tira de 6 s já ocupa a largura útil
+     inteira, e espremê-la numa coluna estreita faria o aluno rolar para ver o
+     trecho que o passo está destacando. */
+  @media (min-width: 64rem) {
+    .metodo-grade { grid-template-columns: minmax(0, 1fr) minmax(0, 25rem); }
+  }
+
+  .metodo-trilha {
+    list-style: none; margin: 0; padding: 0;
+    display: flex; flex-wrap: wrap; gap: var(--e-2);
+  }
+  .metodo-chip {
+    display: inline-flex; align-items: center; gap: var(--e-2);
+    min-height: var(--toque); padding: 0 var(--e-3);
+    border: 1px solid var(--linha-2); border-radius: var(--r-pill);
+    background: var(--superficie);
+    font-size: var(--t--2); color: var(--tinta-2); text-align: left;
+    transition: color var(--transicao), border-color var(--transicao), background var(--transicao);
+  }
+  .metodo-chip:hover { border-color: var(--linha-forte); color: var(--tinta); }
+  .metodo-chip[aria-current="step"] {
+    background: var(--tinta); color: var(--papel); border-color: var(--tinta);
+  }
+  .metodo-chip-n {
+    font-family: var(--ff-mono); font-size: 10px; font-weight: 700;
+    font-variant-numeric: tabular-nums; color: var(--tinta-3);
+  }
+  .metodo-chip[aria-current="step"] .metodo-chip-n { color: var(--papel-3); }
+
+  .metodo-bloco { display: grid; gap: var(--e-2); }
+  .metodo-bloco[hidden] { display: none; }
+  .metodo-bloco + .metodo-bloco {
+    border-top: 1px solid var(--linha);
+    padding-top: var(--e-4);
+  }
+  /* Rótulo de bloco em caixa baixa, de propósito: a crítica de design que
+     originou este projeto citava caixa alta espaçada usada como único recurso
+     de hierarquia. Aqui a hierarquia vem de peso, cor e filete. */
+  .metodo-rot {
+    font-size: var(--t--2); font-weight: 700; color: var(--acento);
+  }
+
+  .metodo-desvio {
+    display: grid; gap: 2px; width: 100%; text-align: left;
+    padding: var(--e-3);
+    border: 1px solid var(--linha);
+    border-left: 3px solid var(--linha-2);
+    border-radius: var(--r-2);
+    background: var(--papel-2);
+    transition: border-color var(--transicao), background var(--transicao);
+  }
+  .metodo-desvio:hover { border-left-color: var(--acento); background: var(--superficie); }
+  .metodo-desvio:active { background: var(--papel-3); }
+  .metodo-desvio-nome { font-weight: 650; font-size: var(--t--1); color: var(--tinta); }
+  .metodo-desvio-pivo { font-size: var(--t--2); color: var(--tinta-3); line-height: 1.45; }
+}
+
+/* ==========================================================================
+   BLOCO 7 . PROFUNDIDADE POR NÍVEL DE SUPERFÍCIE
+   --------------------------------------------------------------------------
+   DEFEITO: tudo vivia no mesmo plano. Papel quase branco, cartão branco,
+   faixa de abas quase branca, um filete só. A tela inteira era uma folha, e o
+   olho não tinha como saber o que é casca do produto, o que é conteúdo e o
+   que é objeto clínico.
+
+   CORREÇÃO: quatro níveis claros e um par escuro, declarados em app.css e
+   aplicados aqui. Nada de sombra nova: quem separa é o nível e o filete.
+
+     casca (abas, trilha lateral)   --papel-2      recua
+     página                         --papel
+     cartão                         --superficie   avança
+     papel de ECG                   --ecg-bg       é o objeto
+
+   E, fora da escala clara, o instrumento: caixa em --instrumento, tela em
+   --mon-bg. O monitor deixa de ser "um retângulo escuro" e passa a parecer um
+   aparelho com uma tela dentro, que é exatamente a distinção que o aluno
+   precisa fazer entre traçado impresso e traçado em monitor.
+   ========================================================================== */
+@layer layout {
+  .topo { background: color-mix(in srgb, var(--papel-2) 92%, transparent); }
+  .abas { background: var(--papel-2); border-bottom-color: var(--linha-2); }
+  .rodape { border-top-color: var(--linha-2); }
+}
+
+@layer ecg {
+  /* A tira impressa é um documento: bezel claro em volta do papel e filete de
+     objeto. Sem o bezel, cabeçalho e rodapé da tira flutuavam no branco do
+     cartão e a tira não tinha começo nem fim. */
+  .ecg-tira { border-color: var(--linha-2); background: var(--papel-2); }
+  .ecg-cabeca, .ecg-pe { background: var(--papel-2); color: var(--tinta-3); }
+  .ecg-dica-rolagem { background: var(--papel-2); }
+
+  /* A CAIXA do aparelho. A tela continua em --mon-bg, pintada pelo próprio
+     SVG; o que muda é a moldura em volta dela. Especificidade maior que a das
+     regras de tira impressa acima, de propósito. */
+  .ecg-tira:has(.ecg-monitor),
+  .monitor {
+    background: var(--instrumento);
+    border-color: var(--instr-linha);
+  }
+  .ecg-tira:has(.ecg-monitor) .ecg-cabeca,
+  .ecg-tira:has(.ecg-monitor) .ecg-pe,
+  .monitor-topo,
+  .monitor-base {
+    background: var(--instrumento);
+    border-color: var(--instr-linha);
+    color: var(--mon-rotulo);
+  }
+  /* Estes dois carregavam texto em cinza-azulado escuro sobre fundo escuro:
+     ficavam em torno de 2,5:1. Agora usam --mon-neutro, que mede 6,7:1. */
+  .monitor-aviso { color: var(--mon-neutro); opacity: 1; }
+  .monitor-calib { color: var(--mon-neutro); }
+}
+
+/* ==========================================================================
+   BLOCO 8 . DESKTOP
+   --------------------------------------------------------------------------
+   DEFEITO relatado pelo autor: "a versão de desktop parece site de criança".
+   Concretamente, em 1440 px:
+
+     1. a navegação eram oito pílulas numa faixa que rola na horizontal. Faixa
+        rolável de pílulas é chrome de celular. Num monitor ela anuncia "isto
+        é um site mobile esticado", que é literalmente a queixa.
+     2. o conteúdo parava em 68 rem centrados, com 176 px de folga vazia de
+        cada lado, e dentro dele o texto ainda parava na medida de leitura. A
+        página inteira era uma coluna estreita boiando no meio da tela.
+     3. a densidade era a mesma do celular: mesmo vão entre seções, mesmo
+        cartão, mesmo tudo.
+
+   CORREÇÃO, a partir de 80 rem (1280 px):
+
+     A casca vira grade de duas colunas. A NAVEGAÇÃO vai para uma trilha
+     lateral fixa à esquerda, que é onde ela deve estar num produto de estudo
+     com oito seções: as oito ficam visíveis ao mesmo tempo, sem rolar, e a
+     trilha carrega também a marca e o progresso. É a faixa lateral pedida:
+     âncoras e progresso saem da coluna de leitura.
+
+     O conteúdo ocupa o resto. A coluna de leitura sobe de 68 para 72
+     caracteres, e o que NÃO é texto corrido passa a usar a largura inteira:
+     grades de cartão, tiras de ECG, tabelas e as três ferramentas da bancada.
+     Esticar a linha de leitura até 140 caracteres seria trocar um defeito por
+     outro pior, então não é isso que se faz aqui.
+
+   Abaixo de 80 rem nada disso vale: o iPad continua com a faixa de abas
+   horizontal, que é o certo para 768 e 1024 px.
+   ========================================================================== */
+@media (min-width: 80rem) {
+  @layer layout {
+    /* --- a casca vira grade: trilha à esquerda, conteúdo à direita --- */
+    .casca {
+      display: grid;
+      grid-template-columns: 16.5rem minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) auto;
+      min-height: 100svh;
+    }
+
+    /* A trilha ocupa as duas linhas da grade e acompanha a rolagem. Tem
+       altura de tela e rola por dentro se a lista de seções crescer, para
+       nunca esconder a última. */
+    .topo {
+      grid-column: 1;
+      grid-row: 1 / -1;
+      position: sticky;
+      top: 0;
+      align-self: start;
+      height: 100svh;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      background: var(--papel-2);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      border-bottom: 0;
+      border-right: 1px solid var(--linha-2);
+      padding-inline: 0;
+    }
+
+    /* Marca e progresso empilhados no alto da trilha: identidade, depois
+       "onde eu estou", depois para onde ir. */
+    .topo-interno {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: var(--e-4);
+      max-width: none;
+      margin-inline: 0;
+      padding: var(--e-6) var(--e-5) var(--e-5);
+    }
+    .marca-mark { height: 26px; }
+    /* Numa coluna de 16,5 rem sobram cerca de 176 px para o nome depois do
+       mark. Em --t-0 ele cabe em uma linha; a quebra fica liberada como rede,
+       porque o nowrap herdado do cabeçalho horizontal transbordaria a trilha
+       em vez de encolher. */
+    .marca-nome { font-size: var(--t-0); white-space: normal; }
+    .topo-progresso {
+      margin-left: 0;
+      gap: var(--e-3);
+      padding-top: var(--e-4);
+      border-top: 1px solid var(--linha-2);
+    }
+
+    /* --- as abas viram lista vertical --- */
+    .abas {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 2px;
+      overflow: visible;
+      padding: 0 var(--e-3) var(--e-6);
+      border-bottom: 0;
+      background: transparent;
+      scroll-snap-type: none;
+    }
+    .aba {
+      width: 100%;
+      justify-content: flex-start;
+      min-height: 40px;
+      padding: 0 var(--e-3);
+      border-radius: var(--r-2);
+      font-size: var(--t--1);
+      font-weight: var(--p-medio);
+      color: var(--tinta-3);
+      /* O indicador troca de baixo para a esquerda: numa lista vertical,
+         sublinhado não indica nada. */
+      box-shadow: inset 2px 0 0 0 transparent;
+      transition: color var(--transicao), background var(--transicao), box-shadow var(--transicao);
+    }
+    .aba:hover { color: var(--tinta); background: var(--papel-3); }
+    .aba[aria-selected="true"] {
+      color: var(--tinta);
+      font-weight: var(--p-semi);
+      background: var(--superficie);
+      box-shadow: inset 2px 0 0 0 var(--acento);
+    }
+    .aba:focus-visible { outline-offset: -2px; }
+
+    /* --- conteúdo --- */
+    .conteudo {
+      grid-column: 2;
+      grid-row: 1;
+      max-width: 74rem;
+      margin-inline: 0;
+      padding-inline: clamp(var(--e-6), 4vw, var(--e-9));
+      padding-block: var(--e-8) var(--e-10);
+    }
+    .rodape {
+      grid-column: 2;
+      grid-row: 2;
+      padding-inline: clamp(var(--e-6), 4vw, var(--e-9));
+    }
+    .rodape-interno { max-width: 74rem; margin-inline: 0; }
+
+    /* Nada mais rola na horizontal: o véu de "tem mais para o lado" sai. */
+    .topo::after { content: none; }
+
+    /* A âncora de :target descontava um cabeçalho que não está mais no topo. */
+    :target { scroll-margin-top: var(--e-6); }
+  }
+
+  @layer componentes {
+    /* Cartão de desktop: canto menor e respiro maior. Raio de 16 px em cartão
+       largo é parte do que dava aspecto infantil; 12 px lê como ficha. */
+    .cartao { padding: var(--e-5) var(--e-6); border-radius: var(--r-3); }
+    .cartao--calmo { padding: var(--e-5); }
+
+    /* A nota de margem ganha o recuo que tem no livro impresso. */
+    .nota { padding-left: var(--e-5); border-left-width: 2px; }
+  }
+
+  @layer refino {
+    /* Grades de cartão: coluna mínima maior, para o cartão não virar um
+       cartãozinho de 17 rem perdido numa fileira de cinco. */
+    .grade-auto {
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+      gap: var(--e-5);
+    }
+
+    /* --- A BANCADA VIRA INSTRUMENTO DE DUAS COLUNAS ---------------------
+       O gerador empilhava controles, botões, tira e laudo. Em 1440 px isso
+       deixa a tira com quase mil px e cada trilha de controle com o mesmo
+       tanto, o que é uma trilha impossível de ajustar com precisão, e ainda
+       obriga o aluno a rolar entre o controle que ele move e o traçado que
+       deveria estar mudando na frente dele.
+
+       Em duas colunas a mão e o efeito ficam no mesmo campo de visão, que é o
+       ponto pedagógico inteiro da ferramenta.
+
+       As linhas são explícitas, e não automáticas, porque .desafio começa com
+       [hidden]: item oculto sai do fluxo da grade e deslocaria tudo o que
+       viesse depois se a colocação fosse por fluxo. */
+    #ferramenta-gerador > .cartao {
+      display: grid;
+      grid-template-columns: minmax(0, 23rem) minmax(0, 1fr);
+      grid-template-rows: auto auto auto 1fr auto;
+      column-gap: var(--e-6);
+      row-gap: var(--e-5);
+      align-items: start;
+    }
+    #ferramenta-gerador > .cartao > * { margin-top: 0; }
+    #ferramenta-gerador > .cartao > :first-child     { grid-column: 1 / -1; grid-row: 1; }
+    #ferramenta-gerador > .cartao > .desafio         { grid-column: 1 / -1; grid-row: 2; }
+    #ferramenta-gerador > .cartao > [data-controles] { grid-column: 1; grid-row: 3; }
+    #ferramenta-gerador > .cartao > .linha           { grid-column: 1; grid-row: 4; align-self: start; }
+    #ferramenta-gerador > .cartao > .laudo           { grid-column: 2; grid-row: 4; }
+    #ferramenta-gerador > .cartao > .miudo           { grid-column: 1 / -1; grid-row: 5; }
+    /* A tira tem 189 px de altura contra 360 px da pilha de seis controles ao
+       lado. Alinhada ao topo, sobrariam 171 px de buraco embaixo dela. No
+       centro, a mesma folga vira 85 px em cima e 85 px embaixo, e o traçado
+       lê como um instrumento montado ao lado do painel, que é o que ele é. */
+    #ferramenta-gerador > .cartao > .ecg-tira        { grid-column: 2; grid-row: 3; align-self: center; }
+
+    /* Paquímetro: o traçado ocupa a coluna larga e TUDO o que se lê sobre ele
+       fica na coluna estreita ao lado, na ordem em que se usa: a tarefa, o
+       seletor, a medida, os botões e a correção. Antes, a correção da medida
+       aparecia abaixo do traçado, fora do campo de visão de quem acabou de
+       arrastar o marcador, que é justamente o momento em que ela importa. */
+    #ferramenta-paquimetro > .cartao {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
+      grid-template-rows: auto auto auto auto auto;
+      column-gap: var(--e-6);
+      row-gap: var(--e-4);
+      align-items: start;
+    }
+    #ferramenta-paquimetro > .cartao > * { margin-top: 0; }
+    #ferramenta-paquimetro > .cartao > :first-child    { grid-column: 1 / -1; grid-row: 1; }
+    #ferramenta-paquimetro > .cartao > .ecg-tira       { grid-column: 1; grid-row: 2 / span 3; }
+    #ferramenta-paquimetro > .cartao > .linha          { grid-column: 1; grid-row: 5; }
+    #ferramenta-paquimetro > .cartao > .paq-tarefa     { grid-column: 2; grid-row: 2; }
+    #ferramenta-paquimetro > .cartao > .paq-opcoes     { grid-column: 2; grid-row: 3; }
+    #ferramenta-paquimetro > .cartao > .laudo          { grid-column: 2; grid-row: 4; }
+    #ferramenta-paquimetro > .cartao > [data-veredito] { grid-column: 2; grid-row: 5; }
+    #ferramenta-paquimetro > .cartao > .miudo          { grid-column: 1 / -1; grid-row: 6; }
+
+    /* Eixo: a roda hexaxial pode crescer, agora que há largura para ela. */
+    .eixo-palco { grid-template-columns: minmax(0, 18rem) minmax(0, 1fr); gap: var(--e-6); }
+    .eixo-roda { max-width: 18rem; }
+
+    /* Anatomia do batimento: o painel de explicação deixa de ser uma tira
+       estreita ao lado de um desenho apertado. */
+    .anat-grade { grid-template-columns: minmax(0, 1fr) minmax(0, 22rem); gap: var(--e-6); }
+
+    /* Os nove passos, em duas colunas. Nove blocos dobráveis empilhados numa
+       coluna única é uma escada de nove cliques com meia tela vazia ao lado.
+
+       O seletor exige .empilha de propósito: [data-passos] sozinho também
+       alcança a barra de progresso do Plantão, que é um <span class=
+       "progresso" data-passos> com pontinhos. Vira-la numa grade de duas
+       colunas quebraria a barra. */
+    .empilha[data-passos] {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--e-3);
+      align-items: start;
+    }
+    .empilha[data-passos] > * + * { margin-top: 0; }
+  }
+}
+
+/* Monitor muito largo: o conteúdo para de crescer, mas a trilha continua
+   colada na borda esquerda da tela, que é onde o cursor a encontra. */
+@media (min-width: 110rem) {
+  @layer layout {
+    .conteudo, .rodape-interno { max-width: 80rem; }
+  }
+}
+
+/* ==========================================================================
+   BLOCO 9 . iPAD, O ALVO PRIMÁRIO
+   --------------------------------------------------------------------------
+   768 a 1024 px. Aqui a faixa de abas horizontal continua sendo o certo: são
+   oito seções, e uma trilha lateral comeria um quinto de uma tela de 834 px.
+   O que muda é densidade e ritmo, para a página não ser nem um celular
+   esticado nem um desktop espremido.
+   ========================================================================== */
+@media (min-width: 48rem) and (max-width: 79.99rem) {
+  @layer layout {
+    .conteudo { max-width: 60rem; padding-block: var(--e-7) var(--e-9); }
+    .aba { padding-inline: var(--e-4); font-size: var(--t--1); font-weight: var(--p-medio); }
+    .aba[aria-selected="true"] { font-weight: var(--p-semi); }
+  }
+  @layer refino {
+    .grade-auto { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-5); }
+    [data-passos] {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--e-3);
+      align-items: start;
+    }
+    [data-passos] > * + * { margin-top: 0; }
+  }
+}
+
+/* ==========================================================================
+   BLOCO 7 . REDE DE SEGURANÇA DA ANIMAÇÃO
+   DEFEITO POSSÍVEL, não observado: a partir da adoção da biblioteca Motion,
+   o app.js esconde seções em `opacity: 0` no atributo style para revelá-las
+   logo depois. Estilo embutido é o mais forte que existe na cascata, então
+   qualquer contexto que não execute a animação mostraria a seção em branco.
+   Impressão é o caso concreto: aluno que manda a aula para o papel ou para
+   PDF não roda animação nenhuma.
+
+   `!important` aqui é a ferramenta certa e não um atalho: é a única coisa
+   que vence atributo style. O alcance é o mínimo possível, só dentro da
+   vista e só nas duas propriedades que a animação usa.
+   ========================================================================== */
+@media print {
+  #vista *, #progresso-topo * {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* Preset selecionado precisa se distinguir de preset sob o cursor.
+   Sem isto o hover parecia selecao e o aluno lia o rotulo de um preset com os
+   valores de outro. */
+@layer componentes {
+  .btn--contorno[aria-pressed="true"] {
+    background: var(--tinta);
+    border-color: var(--tinta);
+    color: var(--papel);
+    font-weight: var(--p-semi);
+  }
+  .btn--contorno[aria-pressed="true"]:hover { background: var(--tinta-2); border-color: var(--tinta-2); }
 }

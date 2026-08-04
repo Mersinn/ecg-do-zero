@@ -931,8 +931,8 @@ export const QUESTOES = [
       'É a correta porque liga a duração da arritmia ao risco de embolia no momento da reversão.',
     ],
     variavelDecisiva: 'Se o aluno associa duração da fibrilação atrial ao risco de embolia na reversão.',
-    pegadinha: 'Divergência de fontes: a regra clássica usa 48 horas como limiar e a diretriz europeia recente reduziu para 24 horas. Em ambas, a anticoagulação segue por pelo menos 4 semanas após a cardioversão.',
-    fonte: 'library.js, padrão fa; auditoria médica do projeto (limiar de 48 h contra 24 h e as 4 semanas pós-cardioversão).',
+    pegadinha: 'Divergência de fontes: a regra clássica usa 48 horas como limiar e as Diretrizes ESC/EACTS de 2024 para fibrilação atrial reduziram para 24 horas. Em ambas, a anticoagulação segue por pelo menos 4 semanas após a cardioversão.',
+    fonte: 'library.js, padrão fa; 2024 ESC/EACTS Guidelines for the management of atrial fibrillation (European Heart Journal), que fixam o limiar de 24 h e as 4 semanas pós-cardioversão.',
   },
 
   {

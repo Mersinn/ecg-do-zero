@@ -7,12 +7,13 @@
  */
 
 import { PADROES, FAMILIAS, PASSOS, montarRitmo } from './ecg/library.js';
-import { renderizarTira } from './ecg/engine.js';
+import { renderizarTira, PAPEL } from './ecg/engine.js';
 import { criarMonitor } from './ecg/monitor.js';
 import { criarGerador, criarEixo, criarPaquimetro } from './tools.js';
 import { criarAnatomia } from './anatomy.js';
 import { telaPapel, ligarPapel } from './screens/papel.js';
 import { telaPlantao, ligarPlantao } from './screens/plantao.js';
+import { animate, inView, hover, press, scroll, spring, stagger, respeitaMovimento } from './motion.js';
 import * as store from './store.js';
 
 /* Conteúdo produzido separadamente. Carregado sob demanda para que o app
@@ -154,6 +155,364 @@ function tiraGuiada(chave) {
 }
 
 /* ==========================================================================
+   MOVIMENTO
+
+   A biblioteca e a Motion, vendorizada em vendor/motion.js e importada pela
+   fachada em ./motion.js. Aqui ficam apenas os pontos de uso, e cada um existe
+   por um motivo declarado no comentario acima dele.
+
+   O que deliberadamente NAO se anima: o tracado do ECG (tem motor proprio, em
+   engine.js e monitor.js), os numeros do laudo das ferramentas e qualquer texto
+   que o aluno precise ler parado. Movimento aqui serve para dizer "isto
+   respondeu" e para costurar a troca de tela, nunca para enfeitar leitura.
+   ========================================================================== */
+
+/* Uma mola so, usada em quase tudo, para que o site tenha uma fisica e nao
+   cinco. Curta e com pouco balanco: a intencao e responder, nao saltar. */
+const MOLA = { type: spring, stiffness: 320, damping: 30, mass: 0.9 };
+/* Mais dura e mais leve: toque precisa devolver resposta dentro do tempo em
+   que o dedo ainda esta na tela, senao nao e lido como resposta. */
+const MOLA_TOQUE = { type: spring, stiffness: 560, damping: 26, mass: 0.55 };
+
+/**
+ * Tudo que precisa ser desligado quando a tela troca.
+ *
+ * hover, press, inView e scroll registram ouvintes que sobrevivem ao innerHTML,
+ * exatamente como os monitores ao vivo sobrevivem. Mesmo problema, mesma
+ * solucao: a vista tem um dono so, entao basta desligar todos antes de
+ * redesenhar.
+ */
+const movimentosVivos = new Set();
+
+/**
+ * Pode animar algo que comeca escondido para so depois aparecer?
+ *
+ * Alem da preferencia do sistema, entra aqui a aba em segundo plano. Numa aba
+ * oculta o navegador congela o requestAnimationFrame, e uma animacao que
+ * comeca em opacidade zero simplesmente nunca sai do zero: o aluno que abrir o
+ * site em nova aba e so depois trocar para ela encontraria a pagina em branco.
+ * Nesse caso nao se esconde nada, e a tela aparece pronta, que e o
+ * comportamento correto de qualquer forma.
+ *
+ * Gesto de toque nao passa por aqui: nao ha dedo em aba oculta.
+ */
+const podeRevelar = () => respeitaMovimento() && !document.hidden;
+
+/**
+ * Cartoes ja ligados a hover e press, e como desliga-los.
+ *
+ * Mapa, e nao apenas um conjunto de funcoes, porque o Plantao recria a lista de
+ * casos toda vez que o aluno volta de um caso sem que a casca navegue. Sem uma
+ * chave por elemento, cada ida e volta deixaria dezoito cartoes desconectados
+ * presos na memoria pelo proprio fecho que iria desliga-los.
+ */
+const gestosPorCartao = new Map();
+
+/** Desliga os gestos dos cartoes que ja sairam do documento. */
+function podarGestos() {
+  for (const [el, desligadores] of gestosPorCartao) {
+    if (el.isConnected) continue;
+    for (const desligar of desligadores) {
+      try { desligar(); } catch { /* ja desligado */ }
+    }
+    gestosPorCartao.delete(el);
+  }
+}
+
+function matarMovimentos() {
+  for (const desligar of movimentosVivos) {
+    try { desligar(); } catch { /* ja desligado */ }
+  }
+  movimentosVivos.clear();
+
+  for (const desligadores of gestosPorCartao.values()) {
+    for (const desligar of desligadores) {
+      try { desligar(); } catch { /* ja desligado */ }
+    }
+  }
+  gestosPorCartao.clear();
+}
+
+/** Devolve o elemento ao estado do CSS, sem sobra de estilo embutido. */
+function limparMovimento(el) {
+  el.style.removeProperty('opacity');
+  el.style.removeProperty('transform');
+  el.style.removeProperty('will-change');
+}
+
+/**
+ * Rede de seguranca de toda animacao que comeca escondendo alguma coisa.
+ *
+ * Nao basta checar document.hidden. Uma aba pode estar com visibilityState
+ * "visible" e mesmo assim nao receber quadro nenhum: janela totalmente coberta
+ * por outra, aparelho em economia de energia, janela minimizada em parte dos
+ * sistemas. Nesses estados o requestAnimationFrame congela, a animacao nunca
+ * avanca e o `finished` que devolveria o conteudo nunca resolve. O resultado
+ * seria uma pagina em branco sem nenhum erro no console, que e o pior defeito
+ * possivel de mandar para um calouro.
+ *
+ * O setTimeout continua correndo nesses estados, ainda que mais devagar. Ele e
+ * o unico ponto de apoio confiavel, e por isso e ele que fecha a conta: passado
+ * o prazo, o que ainda estiver exatamente em opacidade zero volta ao CSS. Se a
+ * animacao correu normalmente, nao ha o que fazer e a rede nao faz nada.
+ */
+function redeDeSeguranca(alvos, ms = 1400) {
+  const t = setTimeout(() => {
+    for (const el of alvos) if (el.style.opacity === '0') limparMovimento(el);
+  }, ms);
+  movimentosVivos.add(() => clearTimeout(t));
+}
+
+/**
+ * Entrada de conteudo: deslocamento curto para cima, com mola, em cascata.
+ *
+ * Existe porque a troca seca de tela era parte do que fazia a navegacao parecer
+ * amadora: o conteudo simplesmente aparecia trocado, sem nada dizer de onde
+ * veio. Dez pixels e o suficiente para o olho registrar a direcao da troca sem
+ * que ninguem precise esperar a animacao acabar para ler.
+ *
+ * O estilo embutido e removido no fim de proposito: um `transform` residual
+ * mantem o elemento numa camada de composicao propria, e ai o canvas do monitor
+ * e o SVG do tracado ficam reamostrados e levemente borrados no iPad.
+ */
+function deslizarEntrada(elementos, { distancia = 10, escalonar = 0.035 } = {}) {
+  const alvos = elementos.filter(Boolean);
+  if (!alvos.length || !podeRevelar()) return;
+
+  for (const el of alvos) {
+    el.style.opacity = '0';
+    el.style.transform = `translateY(${distancia}px)`;
+    el.style.willChange = 'opacity, transform';
+  }
+
+  const restaurar = () => { for (const el of alvos) limparMovimento(el); };
+
+  try {
+    const controle = animate(
+      alvos,
+      { opacity: [0, 1], y: [distancia, 0] },
+      { ...MOLA, delay: stagger(escalonar) },
+    );
+    controle.finished.then(restaurar, restaurar);
+    movimentosVivos.add(() => { try { controle.stop(); } catch { /* ja parou */ } restaurar(); });
+    redeDeSeguranca(alvos);
+  } catch {
+    restaurar();
+  }
+}
+
+/**
+ * As secoes de primeiro nivel da tela atual, na ordem em que estao na pagina.
+ *
+ * Nao da para assumir que sao os filhos da vista. A tela "O papel" devolve uma
+ * folha <style> antes do conteudo, e quase toda tela embrulha tudo num
+ * .empilha-g. Sem descer um nivel, a animacao de entrada trataria a tela inteira
+ * como um bloco unico e a cascata nao existiria.
+ */
+function secoesDaVista(raiz) {
+  const SEM_CAIXA = ['STYLE', 'SCRIPT', 'LINK', 'TEMPLATE'];
+  const visiveis = (lista) => lista.filter((el) => !SEM_CAIXA.includes(el.tagName));
+
+  let nivel = visiveis([...raiz.children]);
+  if (nivel.length === 1 && nivel[0].children.length > 1) nivel = visiveis([...nivel[0].children]);
+
+  /* A fila de revisao tem animacao propria, item a item. Sem esta exclusao ela
+     entraria duas vezes, a secao inteira e depois cada cartao dentro dela. */
+  return nivel.filter((el) => !el.hasAttribute('data-fila'));
+}
+
+/**
+ * hover e press nos cartoes clicaveis de modulo, de padrao e de caso.
+ *
+ * No desktop o cursor ja denuncia o que e clicavel. No celular e no iPad nao ha
+ * cursor nenhum, e um cartao que nao se mexe ao ser tocado nao se distingue de
+ * uma caixa de texto. O afundar sob o dedo e o unico sinal disponivel ali, e
+ * por isso este e o unico ponto de movimento que o app tem em estado ocioso.
+ *
+ * Idempotente: pode ser chamada de novo quando conteudo novo entra na vista.
+ */
+function ligarGestosDeCartao(raiz) {
+  if (!respeitaMovimento()) return;
+  podarGestos();
+
+  for (const el of raiz.querySelectorAll('button.cartao:not([data-gesto])')) {
+    el.dataset.gesto = '1';
+    gestosPorCartao.set(el, [
+      hover(el, () => {
+        animate(el, { scale: 1.012 }, MOLA);
+        return () => animate(el, { scale: 1 }, MOLA);
+      }),
+      press(el, () => {
+        animate(el, { scale: 0.975 }, MOLA_TOQUE);
+        return () => animate(el, { scale: 1 }, MOLA_TOQUE);
+      }),
+    ]);
+  }
+}
+
+/**
+ * Fila de revisao: os cartoes entram um a um.
+ *
+ * A fila e uma cobranca, nao um enfeite. Vendo os cartoes chegarem em sequencia
+ * o aluno le "sao tantos", que e a informacao que a tela quer passar. Uma grade
+ * inteira aparecendo pronta le como fundo de pagina.
+ */
+function animarFilaDeRevisao(raiz) {
+  const secoes = [...raiz.querySelectorAll('[data-fila]')];
+  for (const secao of secoes) {
+    const cartoes = [...secao.querySelectorAll('.cartao')];
+    deslizarEntrada([secao], { distancia: 8, escalonar: 0 });
+    if (cartoes.length) deslizarEntrada(cartoes, { distancia: 12, escalonar: 0.045 });
+  }
+}
+
+/**
+ * Contadores do painel de desempenho: o numero sobe ate o valor.
+ *
+ * Aqui contar tem funcao. O painel e o unico lugar onde o aluno ve o total do
+ * que ja domina, e o numero subindo dá a esse total o peso de algo acumulado.
+ * Nao confundir com os numeros do laudo das ferramentas, que sao medida e
+ * precisam estar parados e certos no primeiro quadro.
+ */
+function animarContadores(raiz) {
+  if (!podeRevelar()) return;
+
+  for (const el of raiz.querySelectorAll('[data-conta-ate]')) {
+    const fim = Number(el.dataset.contaAte);
+    if (!Number.isFinite(fim) || fim <= 0) continue;
+    const sufixo = el.dataset.contaSufixo || '';
+    const encerrar = () => { el.textContent = `${fim}${sufixo}`; };
+
+    el.textContent = `0${sufixo}`;
+    try {
+      const controle = animate(0, fim, {
+        duration: Math.min(0.9, 0.3 + fim * 0.03),
+        ease: 'easeOut',
+        onUpdate: (v) => { el.textContent = `${Math.round(v)}${sufixo}`; },
+      });
+      controle.finished.then(encerrar, encerrar);
+      movimentosVivos.add(() => { try { controle.stop(); } catch { /* ja parou */ } encerrar(); });
+      /* Mesma rede das secoes, e aqui ela importa ainda mais: uma secao presa
+         fica invisivel, mas um contador preso mostra um numero ERRADO. Dizer a
+         quem dominou onze padroes que ele dominou zero nao e defeito de
+         animacao, e informacao falsa sobre o proprio estudo. */
+      const t = setTimeout(encerrar, 1400);
+      movimentosVivos.add(() => clearTimeout(t));
+    } catch {
+      encerrar();
+    }
+  }
+}
+
+/**
+ * Secoes longas revelam-se conforme entram na tela.
+ *
+ * Vale para as aulas e para a tela de um padrao, que passam de tres alturas de
+ * tela. So as secoes fora do primeiro lote entram por aqui: as primeiras ja
+ * chegaram pela animacao de troca de tela e nao devem esperar rolagem.
+ */
+function revelarAoEntrar(raiz) {
+  if (!podeRevelar()) return;
+  if (typeof IntersectionObserver !== 'function') return;
+
+  const alvos = secoesDaVista(raiz).slice(3);
+  if (!alvos.length) return;
+
+  for (const el of alvos) {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(14px)';
+  }
+
+  try {
+    /* Sem `amount`: o padrao da Motion dispara com qualquer pedaco visivel.
+       Exigir uma fracao do elemento deixaria secao mais alta que a tela sem
+       nunca atingir o limiar, e portanto invisivel para sempre. */
+    const parar = inView(alvos, (el) => {
+      const restaurar = () => limparMovimento(el);
+      /* Este try nao e decorativo. Este e o unico ponto do app onde conteudo
+         fica invisivel esperando uma segunda chamada acontecer. Se essa chamada
+         falhar sem rede, a secao some da pagina em silencio, e nada e pior de
+         entregar a um calouro do que meia aula em branco. */
+      try {
+        animate(el, { opacity: [0, 1], y: [14, 0] }, MOLA).finished.then(restaurar, restaurar);
+        redeDeSeguranca([el]);
+      } catch {
+        restaurar();
+      }
+    });
+    movimentosVivos.add(parar);
+    movimentosVivos.add(() => { for (const el of alvos) limparMovimento(el); });
+  } catch {
+    for (const el of alvos) limparMovimento(el);
+  }
+}
+
+/**
+ * A dica "arraste para o lado" some conforme a tira e arrastada.
+ *
+ * E a unica coisa ligada a rolagem no site, e nao toca no tracado: some o aviso,
+ * nao o ECG. O motivo e simples, a dica ja cumpriu a funcao dela no instante em
+ * que o aluno arrastou, e um aviso que fica depois de obedecido vira ruido.
+ */
+function ligarDicaDeRolagem(raiz) {
+  if (!respeitaMovimento()) return;
+
+  for (const tira of raiz.querySelectorAll('.ecg-tira')) {
+    const rolador = tira.querySelector('.ecg-scroller');
+    const dica = tira.querySelector('.ecg-dica-rolagem');
+    if (!rolador || !dica) continue;
+    if (rolador.scrollWidth <= rolador.clientWidth + 4) continue;
+
+    try {
+      movimentosVivos.add(scroll(
+        (progresso) => { dica.style.opacity = String(Math.max(0, 1 - progresso * 5)); },
+        { source: rolador, axis: 'x' },
+      ));
+      movimentosVivos.add(() => dica.style.removeProperty('opacity'));
+    } catch { /* sem rolagem ligada, a dica so fica parada */ }
+  }
+}
+
+/**
+ * Conteudo que nasce depois da troca de tela.
+ *
+ * O Plantao troca o proprio miolo sem passar por ir(): entra num caso, volta ao
+ * indice, e nesse momento aparecem cartoes que nunca viram ligarGestosDeCartao.
+ * Observar a vista resolve isso para o Plantao e para qualquer tela futura, sem
+ * obrigar cada uma a lembrar de avisar a casca.
+ */
+function observarConteudoNovo(raiz) {
+  if (typeof MutationObserver !== 'function') return;
+
+  let agendado = false;
+  const observador = new MutationObserver((registros) => {
+    /* Entrada de tela interna do Plantao: filhos diretos do palco. */
+    const entrando = [];
+    for (const r of registros) {
+      if (!(r.target instanceof Element) || !r.target.matches('[data-plantao]')) continue;
+      for (const n of r.addedNodes) if (n.nodeType === 1) entrando.push(n);
+    }
+    if (entrando.length) deslizarEntrada(entrando.slice(0, 6));
+
+    /* Agrupa a rajada de mutacoes de um innerHTML numa passada so. O adiamento
+       e por setTimeout e nao por requestAnimationFrame de proposito: em aba
+       oculta o rAF fica congelado, e ligar gesto e fiacao de interacao, nao
+       desenho. Com rAF, um caso do Plantao aberto em segundo plano voltava ao
+       indice com os dezoito cartoes sem resposta ao toque. */
+    if (agendado) return;
+    agendado = true;
+    setTimeout(() => {
+      agendado = false;
+      ligarGestosDeCartao(raiz);
+    }, 0);
+  });
+
+  /* Apenas childList: as animacoes mexem em `style` e em `data-gesto`, e
+     observar atributos faria o observador acordar a si mesmo em laco. */
+  observador.observe(raiz, { childList: true, subtree: true });
+}
+
+/* ==========================================================================
    TELAS
    ========================================================================== */
 
@@ -170,7 +529,98 @@ const TELAS = [
 
 /* --------------------------------------------------------------- MÉTODO -- */
 
+/**
+ * Os nove passos deixaram de ser uma lista.
+ *
+ * Relato do autor sobre a versão anterior desta tela: "eu mesmo não entendi
+ * porra nenhuma e como usar esses passos, pois eles só estão soltos jogados,
+ * sem qualquer direção ou intuição". Estava certo. Uma lista ordenada informa
+ * a sequência e não ensina a executá-la: o aluno sai sabendo que existem nove
+ * passos e sem saber o que fazer com o primeiro.
+ *
+ * Cada passo virou três coisas: o que PERGUNTAR, o que este traçado RESPONDE,
+ * e para onde a leitura IRIA se a resposta fosse outra. A terceira é a que dá
+ * intuição, e nada nela é inventado: cada desvio aponta para um padrão que já
+ * existe em library.js e mostra o pivô daquele padrão com o texto da própria
+ * biblioteca. Clicar leva ao estudo do padrão, então a sequência também vira
+ * o índice do curso.
+ *
+ * Ao lado fica um traçado de exemplo com o trecho do passo atual destacado.
+ * Trocar de exemplo mantém o passo, de propósito: comparar a mesma pergunta
+ * num traçado normal e num alterado é onde o critério gruda.
+ */
+const METODO_GUIA = {
+  adequacao: {
+    ondeOlhar: 'No pulso de calibração, no canto esquerdo da tira, e no rótulo da derivação.',
+    rotuloDesvios: 'Por que este passo vem antes de todos',
+    desvios: [],
+    nota: 'Este passo não dá diagnóstico nenhum. Ele decide se os oito seguintes valem alguma coisa. Metade do ganho apaga um critério de voltagem, e 50 mm/s dobra a largura aparente do QRS: você mediria com precisão sobre um papel errado.',
+    notaIr: { tela: 'papel', rotulo: 'Ver como o papel funciona' },
+  },
+  ritmo: {
+    ondeOlhar: 'Imediatamente antes de cada QRS, procurando a onda P, e depois comparando os intervalos entre os R.',
+    rotuloDesvios: 'Se a resposta fosse outra',
+    desviosIntro: 'Se não houvesse P antes de cada QRS, ou se a relação entre P e QRS estivesse quebrada, este passo mudaria de resposta e o traçado seria um destes.',
+    desvios: ['fa', 'flutter', 'bavt', 'juncional'],
+  },
+  fc: {
+    ondeOlhar: 'Entre dois R seguidos, contando quadradinhos.',
+    rotuloDesvios: 'Se a resposta fosse outra',
+    desviosIntro: 'A conta é sempre a mesma. O que muda é o número que sai dela, e o nome que esse número recebe.',
+    desvios: ['bradicardia', 'taquiSinusal', 'tsv'],
+  },
+  eixo: {
+    ondeOlhar: 'Em DI e em aVF, que uma tira de ritmo sozinha não mostra.',
+    rotuloDesvios: 'O que esta tira não responde',
+    desvios: [],
+    nota: 'Este é o único dos nove passos que uma tira de ritmo não consegue responder. Eixo precisa de duas derivações ao mesmo tempo, DI e aVF, e por isso ele mora na Bancada, na ferramenta de eixo elétrico. Reconhecer que um passo não é respondível com o que está na sua frente também é parte do método.',
+    notaIr: { tela: 'bancada', rotulo: 'Abrir a ferramenta de eixo' },
+  },
+  intervalos: {
+    ondeOlhar: 'PR do início da P ao início do QRS. QRS de ponta a ponta. QT do início do QRS ao fim da T.',
+    rotuloDesvios: 'Se a resposta fosse outra',
+    desviosIntro: 'Cada intervalo tem o seu próprio corte, e estourar um deles leva a um traçado diferente.',
+    desvios: ['bav1', 'wpw', 'qtLongo', 'mobitz1'],
+  },
+  qrs: {
+    ondeOlhar: 'Na largura do complexo, na existência de onda Q e na altura das deflexões.',
+    rotuloDesvios: 'Se a resposta fosse outra',
+    desviosIntro: 'Largura, onda Q e voltagem são três perguntas dentro do mesmo passo, e cada uma leva para um lado.',
+    desvios: ['brd', 'bre', 'tv', 'sve'],
+  },
+  st: {
+    ondeOlhar: 'Do ponto J em diante, comparando com a linha de base entre o fim da T e a P seguinte.',
+    rotuloDesvios: 'Se a resposta fosse outra',
+    desviosIntro: 'É aqui que a isquemia aparece, e é o passo em que mais se erra por pressa.',
+    desvios: ['stemi', 'infraST', 'pericardite', 'hipercalemia'],
+  },
+  sintese: {
+    ondeOlhar: 'Em nada novo. Aqui você junta o que os sete passos anteriores devolveram, numa frase só.',
+    rotuloDesvios: 'O que sustenta a síntese',
+    desvios: [],
+    nota: (p) => `O pivô deste traçado é: ${p.pivo} O distrator perigoso é: ${p.distrator}`,
+  },
+  conduta: {
+    ondeOlhar: 'No paciente, não no papel. O traçado propõe a hipótese, o quadro clínico decide o que fazer com ela.',
+    rotuloDesvios: 'O que a prova costuma cobrar aqui',
+    desvios: [],
+    nota: (p) => `${p.conduta} ${p.pegadinha}${p.alerta ? ` ${p.alerta}` : ''}`,
+  },
+};
+
+/**
+ * Traçados sobre os quais a sequência pode ser percorrida.
+ *
+ * Escolhidos porque a sequência trava num passo diferente em cada um: no
+ * normal ela não trava, no BAV de 1º grau ela trava nos intervalos, na
+ * fibrilação atrial ela trava logo no ritmo. É o que mostra que a ordem serve
+ * para alguma coisa.
+ */
+const METODO_EXEMPLOS = ['normal', 'bav1', 'fa'];
+
 function telaMetodo() {
+  const exemplos = METODO_EXEMPLOS.filter((k) => PADROES[k]);
+
   return `
   <div class="empilha-g">
     <section class="prosa empilha">
@@ -183,11 +633,71 @@ function telaMetodo() {
       com o nome do diagnóstico já escrito ao lado.</p>
     </section>
 
+    ${exemplos.length ? `
     <section class="empilha">
-      <h2>A sequência de nove passos</h2>
+      <h2>Percorra a sequência uma vez, inteira, sobre um traçado</h2>
+      <p class="prosa fraco">Ler a lista dos nove passos não ensina a usá-los. O que ensina é
+      executá-los uma vez, na ordem, com um traçado na frente. Em cada passo você vê o que
+      perguntar, o que este traçado responde e para onde a leitura iria se a resposta fosse outra.
+      Trocar de exemplo mantém o passo em que você está, para comparar a mesma pergunta em dois
+      traçados diferentes.</p>
+
+      <div class="linha" role="group" aria-label="Traçado de exemplo">
+        ${exemplos.map((k, n) => `
+          <button class="btn btn--contorno btn--pequeno" type="button"
+                  data-metodo-exemplo="${k}" aria-pressed="${n === 0}">${esc(PADROES[k].nome)}</button>`).join('')}
+      </div>
+
+      <div class="metodo-grade">
+        <div class="empilha">
+          <div class="ecg-tira">
+            <div class="ecg-cabeca">
+              <span data-metodo-cabeca></span>
+              <span class="ecg-calib-texto">25 mm/s · 10 mm/mV</span>
+            </div>
+            <div class="ecg-scroller" tabindex="0" role="group" data-metodo-scroller
+                 aria-label="Traçado de exemplo. Role para o lado para ver a tira inteira.">
+              <div class="ecg-palco" data-metodo-palco></div>
+            </div>
+            <div class="ecg-dica-rolagem" data-toque-apenas>Arraste para o lado para ver a tira inteira. A faixa destacada é o trecho do passo atual.</div>
+          </div>
+          <ol class="metodo-trilha" data-metodo-trilha></ol>
+        </div>
+
+        <div class="cartao empilha metodo-passo">
+          <h3 class="cartao-titulo" data-metodo-titulo></h3>
+
+          <div class="metodo-bloco">
+            <p class="metodo-rot">Pergunte</p>
+            <p data-metodo-pergunta></p>
+            <p class="pequeno fraco" data-metodo-onde></p>
+          </div>
+
+          <div class="metodo-bloco">
+            <p class="metodo-rot">Neste traçado, a resposta é</p>
+            <p data-metodo-resposta></p>
+          </div>
+
+          <div class="metodo-bloco" data-metodo-bloco-desvios>
+            <p class="metodo-rot" data-metodo-rot-desvios></p>
+            <p class="pequeno fraco" data-metodo-desvios-intro></p>
+            <div class="empilha" data-metodo-desvios></div>
+          </div>
+
+          <div class="linha">
+            <button class="btn btn--contorno btn--pequeno" type="button" data-metodo-ant>← Passo anterior</button>
+            <span class="progresso-texto" data-metodo-conta></span>
+            <button class="btn btn--principal btn--pequeno" type="button" data-metodo-prox>Próximo passo →</button>
+          </div>
+        </div>
+      </div>
+    </section>` : ''}
+
+    <section class="empilha">
+      <h2>A sequência inteira, para consultar depois</h2>
       <p class="prosa fraco">O curso ensina duas versões dessa sequência, de sete passos cada, que
-      não coincidem entre si: uma vem do roteiro de estágio, outra do guia de OSCE. Aqui está a
-      união das duas, que não deixa buraco.</p>
+      não coincidem entre si: uma vem do roteiro de estágio, outra do guia de OSCE. Esta é a união
+      das duas, que não deixa buraco.</p>
       <ol class="empilha" style="padding-left:1.2rem">
         ${PASSOS.map(([, nome, desc]) => `
           <li><strong>${esc(nome)}.</strong> ${esc(desc)}</li>`).join('')}
@@ -195,6 +705,215 @@ function telaMetodo() {
     </section>
 
   </div>`;
+}
+
+/**
+ * Onde, na tira, mora o passo atual.
+ *
+ * A conta é a geometria real do SVG: x = margem de calibração + tempo a
+ * 25 mm/s. É a mesma que o paquímetro usa para ancorar os marcadores, e é a
+ * razão de o holofote cair sobre a onda certa em vez de perto dela.
+ */
+function metodoFoco(chavePasso, ritmo, escala) {
+  const offsetX = 10 * escala;                       // margem do pulso de calibração
+  const pxPorMs = (PAPEL.velocidade / 1000) * escala;
+  const x = (t) => offsetX + t * pxPorMs;
+
+  if (chavePasso === 'adequacao') {
+    return { xIni: 0, xFim: offsetX, rotulo: 'calibração' };
+  }
+
+  const evs = (ritmo.eventos || []).filter((e) => !e.bloqueada && e.modelo && e.modelo.marcos);
+  if (!evs.length) return null;
+  const i = evs.length > 2 ? 1 : 0;
+  const ev = evs[i];
+  const prox = evs[i + 1];
+  const m = ev.modelo.marcos;
+
+  if (chavePasso === 'ritmo') {
+    // Sem onda P, o holofote passa a mostrar o lugar VAZIO onde ela deveria
+    // estar. Ausência é achado, e achado precisa de endereço na tela.
+    if (m.inicioP == null) {
+      return { xIni: x(ev.t0 - 200), xFim: x(ev.t0 + m.inicioQRS), rotulo: 'onde a P deveria estar' };
+    }
+    return { xIni: x(ev.t0 + m.inicioP - 30), xFim: x(ev.t0 + m.fimP + 30), rotulo: 'onda P' };
+  }
+  if (chavePasso === 'fc') {
+    if (!prox) return null;
+    return { xIni: x(ev.t0 + m.inicioQRS), xFim: x(prox.t0 + prox.modelo.marcos.inicioQRS), rotulo: 'um intervalo R a R' };
+  }
+  if (chavePasso === 'intervalos') {
+    if (m.inicioP == null) return { xIni: x(ev.t0 + m.inicioQRS), xFim: x(ev.t0 + m.fimT), rotulo: 'QRS e QT' };
+    return { xIni: x(ev.t0 + m.inicioP), xFim: x(ev.t0 + m.inicioQRS), rotulo: 'intervalo PR' };
+  }
+  if (chavePasso === 'qrs') {
+    return { xIni: x(ev.t0 + m.inicioQRS), xFim: x(ev.t0 + m.fimQRS), rotulo: 'complexo QRS' };
+  }
+  if (chavePasso === 'st') {
+    return { xIni: x(ev.t0 + m.pontoJ), xFim: x(ev.t0 + m.fimT), rotulo: 'do ponto J ao fim da T' };
+  }
+  return null;   // eixo, síntese e conduta não moram num ponto da tira
+}
+
+function ligarMetodo(raiz) {
+  const palco = raiz.querySelector('[data-metodo-palco]');
+  if (!palco) return;
+
+  const exemplos = METODO_EXEMPLOS.filter((k) => PADROES[k]);
+  if (!exemplos.length) return;
+
+  let chave = exemplos[0];
+  let i = 0;
+  let ritmo = null;
+  let escala = mmPx();
+
+  const elCabeca = raiz.querySelector('[data-metodo-cabeca]');
+  const elScroller = raiz.querySelector('[data-metodo-scroller]');
+  const elTrilha = raiz.querySelector('[data-metodo-trilha]');
+  const elTitulo = raiz.querySelector('[data-metodo-titulo]');
+  const elPergunta = raiz.querySelector('[data-metodo-pergunta]');
+  const elOnde = raiz.querySelector('[data-metodo-onde]');
+  const elResposta = raiz.querySelector('[data-metodo-resposta]');
+  const elBloco = raiz.querySelector('[data-metodo-bloco-desvios]');
+  const elRotDesvios = raiz.querySelector('[data-metodo-rot-desvios]');
+  const elIntro = raiz.querySelector('[data-metodo-desvios-intro]');
+  const elDesvios = raiz.querySelector('[data-metodo-desvios]');
+  const elConta = raiz.querySelector('[data-metodo-conta]');
+
+  function desenharTira() {
+    const p = PADROES[chave];
+    escala = mmPx();
+    ritmo = montarRitmo(chave);
+    palco.innerHTML =
+      renderizarTira(ritmo, {
+        estilo: 'papel', mmPx: escala, alturaMm: 36, derivacao: p.derivacao, id: `met-${chave}`,
+      }) +
+      '<div class="ecg-holofote" data-metodo-holofote hidden></div>' +
+      '<div class="ecg-holofote-rotulo" data-metodo-holofote-rotulo hidden></div>';
+    elCabeca.textContent = `${semTravessao(p.nome)} · ${p.derivacao}`;
+  }
+
+  function pintarHolofote() {
+    const holo = palco.querySelector('[data-metodo-holofote]');
+    const rot = palco.querySelector('[data-metodo-holofote-rotulo]');
+    if (!holo || !rot) return;
+
+    const alvo = metodoFoco(PASSOS[i][0], ritmo, escala);
+    if (!alvo) { holo.hidden = true; rot.hidden = true; return; }
+
+    holo.hidden = false;
+    rot.hidden = false;
+    holo.style.left = `${Math.max(0, alvo.xIni)}px`;
+    holo.style.width = `${Math.max(8, alvo.xFim - alvo.xIni)}px`;
+    rot.style.left = `${(alvo.xIni + alvo.xFim) / 2}px`;
+    rot.textContent = alvo.rotulo;
+
+    if (elScroller && elScroller.scrollWidth > elScroller.clientWidth) {
+      const centro = (alvo.xIni + alvo.xFim) / 2;
+      elScroller.scrollTo({ left: Math.max(0, centro - elScroller.clientWidth / 2), behavior: 'smooth' });
+    }
+  }
+
+  /* A trilha é montada UMA vez. Repintá-la a cada passo destruiria o botão que
+     acabou de ser clicado, e quem navega por teclado perderia o foco no meio
+     da sequência. Só o aria-current muda. */
+  function montarTrilha() {
+    elTrilha.innerHTML = PASSOS.map(([, nome], k) => `
+      <li>
+        <button class="metodo-chip" type="button" data-metodo-passo="${k}"
+                aria-current="false">
+          <span class="metodo-chip-n">${k + 1}</span>${esc(nome)}
+        </button>
+      </li>`).join('');
+  }
+
+  function marcarTrilha() {
+    for (const b of elTrilha.querySelectorAll('[data-metodo-passo]')) {
+      b.setAttribute('aria-current', Number(b.dataset.metodoPasso) === i ? 'step' : 'false');
+    }
+  }
+
+  function pintarDesvios(guia, p) {
+    const lista = (guia.desvios || []).filter((k) => PADROES[k] && k !== chave);
+    const nota = typeof guia.nota === 'function' ? guia.nota(p) : guia.nota;
+
+    elBloco.hidden = !lista.length && !nota;
+    elRotDesvios.textContent = guia.rotuloDesvios || 'Se a resposta fosse outra';
+    elIntro.textContent = guia.desviosIntro || '';
+    elIntro.hidden = !guia.desviosIntro;
+
+    const cartoes = lista.map((k) => {
+      const q = PADROES[k];
+      return `<button class="metodo-desvio" type="button" data-padrao="${k}">
+        <span class="metodo-desvio-nome">${esc(q.nome)}</span>
+        <span class="metodo-desvio-pivo">${esc(q.pivo)}</span>
+      </button>`;
+    });
+
+    if (nota) {
+      cartoes.push(`<div class="nota nota--info">
+        <p>${esc(nota)}</p>
+        ${guia.notaIr ? `<button class="btn btn--contorno btn--pequeno" type="button" style="margin-top:var(--e-3)" data-metodo-ir="${guia.notaIr.tela}">${esc(guia.notaIr.rotulo)}</button>` : ''}
+      </div>`);
+    }
+
+    elDesvios.innerHTML = cartoes.join('');
+  }
+
+  function pintar() {
+    const p = PADROES[chave];
+    const [chavePasso, nome, pergunta] = PASSOS[i];
+    const guia = METODO_GUIA[chavePasso] || {};
+
+    elTitulo.textContent = `${i + 1}. ${semTravessao(nome)}`;
+    elPergunta.textContent = semTravessao(pergunta);
+    elOnde.textContent = guia.ondeOlhar ? `Onde olhar: ${guia.ondeOlhar}` : '';
+    elResposta.textContent = semTravessao(p.leitura[chavePasso] || 'Sem leitura registrada para este passo.');
+    elConta.textContent = `passo ${i + 1} de ${PASSOS.length}`;
+
+    pintarDesvios(guia, p);
+    marcarTrilha();
+    pintarHolofote();
+
+    raiz.querySelector('[data-metodo-ant]').disabled = i === 0;
+    raiz.querySelector('[data-metodo-prox]').disabled = i === PASSOS.length - 1;
+  }
+
+  raiz.querySelector('[data-metodo-prox]').addEventListener('click', () => {
+    if (i < PASSOS.length - 1) { i += 1; pintar(); }
+  });
+  raiz.querySelector('[data-metodo-ant]').addEventListener('click', () => {
+    if (i > 0) { i -= 1; pintar(); }
+  });
+
+  elTrilha.addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-metodo-passo]');
+    if (!b) return;
+    i = Number(b.dataset.metodoPasso);
+    pintar();
+  });
+
+  /* Um ouvinte só, no cartão inteiro: os botões de desvio são recriados a cada
+     passo, então ligar um por um deixaria ouvintes órfãos a cada troca. Os que
+     têm data-padrao já são atendidos pela delegação global de iniciar(). */
+  raiz.addEventListener('click', (ev) => {
+    const exemplo = ev.target.closest('[data-metodo-exemplo]');
+    if (exemplo) {
+      chave = exemplo.dataset.metodoExemplo;
+      for (const b of raiz.querySelectorAll('[data-metodo-exemplo]')) {
+        b.setAttribute('aria-pressed', String(b === exemplo));
+      }
+      desenharTira();
+      pintar();
+      return;
+    }
+    const destino = ev.target.closest('[data-metodo-ir]');
+    if (destino) ir(destino.dataset.metodoIr);
+  });
+
+  montarTrilha();
+  desenharTira();
+  pintar();
 }
 
 /* ---------------------------------------------------------------- PAPEL -- */
@@ -578,14 +1297,14 @@ function telaDesempenho() {
     </section>
 
     <div class="grade-auto">
-      <div class="cartao centro"><div style="font-family:var(--ff-titulo);font-size:var(--t-4)">${r.solidos}</div><div class="etiqueta">padrões dominados</div></div>
-      <div class="cartao centro"><div style="font-family:var(--ff-titulo);font-size:var(--t-4);color:var(--atencao)">${r.frageis}</div><div class="etiqueta">a revisar</div></div>
-      <div class="cartao centro"><div style="font-family:var(--ff-titulo);font-size:var(--t-4)">${r.aproveitamento ?? 'sem dados'}${r.aproveitamento != null ? '%' : ''}</div><div class="etiqueta">acerto em questões</div></div>
-      <div class="cartao centro"><div style="font-family:var(--ff-titulo);font-size:var(--t-4)">${r.casosConcluidos}</div><div class="etiqueta">casos concluídos</div></div>
+      <div class="cartao centro"><div style="font-family:var(--ff-titulo);font-size:var(--t-4)" data-conta-ate="${r.solidos}">${r.solidos}</div><div class="etiqueta">padrões dominados</div></div>
+      <div class="cartao centro"><div style="font-family:var(--ff-titulo);font-size:var(--t-4);color:var(--atencao)" data-conta-ate="${r.frageis}">${r.frageis}</div><div class="etiqueta">a revisar</div></div>
+      <div class="cartao centro"><div style="font-family:var(--ff-titulo);font-size:var(--t-4)"${r.aproveitamento != null ? ` data-conta-ate="${r.aproveitamento}" data-conta-sufixo="%"` : ''}>${r.aproveitamento ?? 'sem dados'}${r.aproveitamento != null ? '%' : ''}</div><div class="etiqueta">acerto em questões</div></div>
+      <div class="cartao centro"><div style="font-family:var(--ff-titulo);font-size:var(--t-4)" data-conta-ate="${r.casosConcluidos}">${r.casosConcluidos}</div><div class="etiqueta">casos concluídos</div></div>
     </div>
 
     ${revisar.length ? `
-    <section class="empilha">
+    <section class="empilha" data-fila>
       <h2>Vencidos para revisão</h2>
       <p class="prosa fraco">A repetição espaçada agenda cada padrão para voltar quando você está
       prestes a esquecê-lo. Estes já venceram.</p>
@@ -598,7 +1317,7 @@ function telaDesempenho() {
     </section>` : ''}
 
     ${frageis.length ? `
-    <section class="empilha">
+    <section class="empilha" data-fila>
       <h2>Marcados como frágeis</h2>
       <p class="prosa fraco">Você acertou por chute, ou errou. Acerto frágil não vira domínio.</p>
       <div class="grade-auto">
@@ -788,6 +1507,10 @@ function ligarQuestoes(raiz) {
 
 const vista = () => document.getElementById('vista');
 
+/* Quantos segmentos da barra do topo ja estavam cheios na pintura anterior.
+   null = ainda nao houve pintura nesta sessao. */
+let segmentosCheiosAntes = null;
+
 function atualizarProgressoTopo() {
   const r = store.resumo(Object.keys(PADROES).length);
   const barra = document.getElementById('progresso-topo');
@@ -797,20 +1520,54 @@ function atualizarProgressoTopo() {
     return `<span class="progresso-seg" data-estado="${i < preenchidos ? 'solido' : ''}"></span>`;
   }).join('');
   document.getElementById('progresso-texto').textContent = `${r.solidos}/${total}`;
+
+  /* A barra e reescrita inteira a cada pintura, entao sem esta contagem os doze
+     segmentos reapareceriam do zero a cada troca de aba. So o que ganhou valor
+     desde a ultima pintura se anima: o resto ja estava la e ja foi visto. */
+  const cheios = [...barra.querySelectorAll('.progresso-seg[data-estado="solido"]')];
+  const desde = segmentosCheiosAntes === null ? 0 : Math.min(segmentosCheiosAntes, cheios.length);
+  const novos = cheios.slice(desde);
+  segmentosCheiosAntes = cheios.length;
+
+  if (!novos.length || !podeRevelar()) return;
+  try {
+    for (const seg of novos) seg.style.transformOrigin = 'left center';
+    const controle = animate(
+      novos,
+      { scaleX: [0, 1], opacity: [0.4, 1] },
+      { ...MOLA, delay: stagger(0.04) },
+    );
+    const restaurar = () => {
+      for (const seg of novos) {
+        seg.style.removeProperty('transform');
+        seg.style.removeProperty('opacity');
+        seg.style.removeProperty('transform-origin');
+      }
+    };
+    controle.finished.then(restaurar, restaurar);
+    /* A barra do topo nao mora na vista e por isso nao passa por
+       matarMovimentos. A rede fica aqui mesmo, solta: sem quadro nenhum, os
+       segmentos ficariam em scaleX(0) e a barra pareceria vazia para quem ja
+       dominou metade dos padroes. */
+    setTimeout(restaurar, 1400);
+  } catch { /* a barra ja esta correta sem a animacao */ }
 }
 
 function ir(destino, arg) {
   const raiz = vista();
 
   // A vista inteira vai ser substituída: nada da tela anterior pode continuar
-  // animando.
+  // animando. Vale para os monitores ao vivo e para os ouvintes de gesto,
+  // rolagem e entrada em tela registrados pela Motion.
   matarMonitores();
+  matarMovimentos();
 
   if (destino === 'padrao') {
     raiz.innerHTML = telaPadrao(arg);
     ligarTelaPadrao(raiz, arg);
   } else if (destino === 'metodo') {
     raiz.innerHTML = telaMetodo();
+    ligarMetodo(raiz);
   } else if (destino === 'papel') {
     raiz.innerHTML = telaPapel();
     ligarPapel(raiz);
@@ -825,7 +1582,9 @@ function ir(destino, arg) {
     raiz.innerHTML = telaBancada();
     criarGerador(document.getElementById('ferramenta-gerador'));
     criarEixo(document.getElementById('ferramenta-eixo'));
-    criarPaquimetro(document.getElementById('ferramenta-paquimetro'), { montarRitmo });
+    // PADROES entra aqui para que o paquímetro possa sortear traçados de
+    // verdade da biblioteca e revelar, depois da correção, qual era.
+    criarPaquimetro(document.getElementById('ferramenta-paquimetro'), { montarRitmo, padroes: PADROES });
   } else if (destino === 'plantao') {
     raiz.innerHTML = telaPlantao(CASOS, PADROES);
     ligarPlantao(raiz, {
@@ -849,6 +1608,17 @@ function ir(destino, arg) {
   if (location.hash.slice(1) !== destino) history.replaceState(null, '', `#${destino}`);
   document.getElementById('principal').focus({ preventScroll: true });
   window.scrollTo({ top: 0, behavior: 'instant' });
+
+  /* Movimento sempre por ultimo: a tela ja esta montada e ligada, entao o que se
+     anima aqui e conteudo final, e nao um esqueleto que ainda vai mudar de
+     altura no meio da animacao. */
+  deslizarEntrada(secoesDaVista(raiz).slice(0, 3));
+  revelarAoEntrar(raiz);
+  animarFilaDeRevisao(raiz);
+  animarContadores(raiz);
+  ligarGestosDeCartao(raiz);
+  ligarDicaDeRolagem(raiz);
+
   atualizarProgressoTopo();
 }
 
@@ -877,6 +1647,10 @@ async function iniciar() {
     const alvoPadrao = ev.target.closest('[data-padrao]');
     if (alvoPadrao) { ir('padrao', alvoPadrao.dataset.padrao); return; }
   });
+
+  // Também uma única vez: cobre o conteúdo que nasce sem passar por ir(),
+  // como o índice do Plantão quando o aluno volta de um caso.
+  observarConteudoNovo(vista());
 
   await carregarConteudo();
   const inicial = location.hash.slice(1);
