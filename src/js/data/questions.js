@@ -737,7 +737,7 @@ export const QUESTOES = [
     comandoInvertido: false,
     enunciado: 'Paciente com bloqueio de ramo esquerdo conhecido e dor torácica típica. Qual dos achados abaixo é critério de Sgarbossa e aponta oclusão coronária dentro do BRE?',
     alternativas: [
-      'Supra de ST de 2 mm discordante do QRS em V2.',
+      'Supra de ST de 2 mm discordante do QRS em V2, onde a onda S mede 20 mm.',
       'Supra de ST de 2 mm CONCORDANTE com a polaridade do QRS.',
       'Onda T invertida em V1 e V2.',
       'Infra de ST de 1 mm em V5 e V6.',
@@ -1347,6 +1347,35 @@ export const QUESTOES = [
     variavelDecisiva: 'Se o aluno olha o PR e o QRS juntos, e não apenas a largura do QRS.',
     pegadinha: 'O achado que muda o plantão não é o padrão em ritmo sinusal, e sim o que fazer se esse paciente entrar em fibrilação atrial: nada que bloqueie o nó AV.',
     fonte: 'library.js, padrão wpw.',
+  },
+
+  {
+    id: 'q046',
+    familia: 'outros',
+    padrao: 'juncional',
+    nivel: 'intermediario',
+    operacao: 'reconhecer_dx',
+    comandoInvertido: false,
+    enunciado: 'Homem de 71 anos internado por pneumonia, em uso de betabloqueador, assintomático e bem perfundido. O monitor mostra ritmo regular a 46 bpm, QRS de 0,08 s, sem onda P antes de nenhum complexo, com PA de 118/72 mmHg. Qual o diagnóstico do ritmo?',
+    alternativas: [
+      'Bradicardia sinusal, porque a frequência está abaixo de 60 bpm.',
+      'Ritmo juncional de escape: o nó atrioventricular assumiu o comando na ausência de onda P sinusal, e o QRS permanece estreito porque o estímulo desce pelo sistema de condução normal.',
+      'Bloqueio atrioventricular total, porque não há relação entre onda P e QRS.',
+      'Ritmo idioventricular de escape, dada a frequência abaixo de 50 bpm.',
+      'Fibrilação atrial com resposta ventricular lenta.',
+    ],
+    correta: 1,
+    porQue: 'Bradicardia regular, de QRS estreito e sem onda P sinusal define escape juncional. A faixa própria do nó atrioventricular como marcapasso subsidiário é de 40 a 60 por minuto, e 46 bpm cai dentro dela. O QRS estreito localiza a origem acima da bifurcação do feixe de His.',
+    porQueErradas: [
+      'Vizinho sedutor: a frequência realmente é de bradicardia, e é aí que muita gente para. Mas bradicardia sinusal exige onda P sinusal precedendo cada QRS, e aqui não há nenhuma.',
+      'É a correta porque reúne os três achados que definem o escape juncional: ausência de P sinusal, QRS estreito e frequência na faixa de 40 a 60.',
+      'No bloqueio total existem ondas P dissociadas, regulares entre si e visíveis marchando através do traçado. Aqui não há onda P alguma a ser dissociada.',
+      'O escape idioventricular é mais lento e tem QRS LARGO, porque nasce abaixo da bifurcação do feixe de His e não usa o sistema de condução rápido.',
+      'A fibrilação atrial é irregularmente irregular; este ritmo é regular.',
+    ],
+    variavelDecisiva: 'A largura do QRS somada à ausência de onda P — é ela que localiza a altura do foco de escape, e não o valor da frequência.',
+    pegadinha: 'Escape é consequência, não doença: a pergunta correta é o que silenciou o nó sinusal — hipertonia vagal, isquemia inferior, hipercalemia ou, como aqui, droga que freia o nó. Nunca suprima um ritmo de escape: ele é o que está mantendo o débito.',
+    fonte: 'library.js, padrão juncional; módulo "outros" de lessons.js (faixas dos marcapassos subsidiários).',
   },
 ];
 

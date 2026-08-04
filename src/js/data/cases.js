@@ -159,9 +159,9 @@ export const CASOS = [
           'Adrenalina em infusão de 2 a 10 mcg/min como primeira escolha',
         ],
         correta: 0,
-        variavelDecisiva: 'A dose correta de atropina — 1 mg, porque doses abaixo de 0,5 mg podem paradoxalmente reduzir ainda mais a frequência.',
-        porQue: 'A bradicardia sinusal é de nível sinusal/nodal e responde à vagólise. O ACLS coloca atropina 1 mg IV a cada 3 a 5 minutos, máximo de 3 mg, como primeira linha na bradicardia sintomática.',
-        porQueSeduz: 'A dose de 0,5 mg circula em material antigo e parece a escolha prudente; hoje ela é justamente a faixa que o manual adverte poder ser bradicardizante.',
+        variavelDecisiva: 'A dose que o algoritmo em vigor estabelece como primeira: 1 mg, e não os 0,5 mg do material antigo.',
+        porQue: 'A bradicardia sinusal é de nível sinusal/nodal e responde à vagólise. O ACLS coloca atropina 1 mg IV a cada 3 a 5 minutos, máximo de 3 mg, como primeira linha na bradicardia sintomática. A advertência separada do manual é sobre doses INFERIORES a 0,5 mg, que podem reduzir ainda mais a frequência por efeito paradoxal.',
+        porQueSeduz: 'A dose de 0,5 mg circula em material antigo e parece a escolha prudente; ela foi substituída por 1 mg como dose inicial, e subdosar aqui só consome os minutos que antecedem a decisão de estimular.',
         movimento: 'erro_de_conduta',
       },
       {

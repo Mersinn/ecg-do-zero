@@ -674,6 +674,13 @@ export const ROTEIROS = {
         'Da linha de base ao pico há mais de dois quadradinhos e meio, ou seja, acima de 2,5 mm em DII. A duração, medida na horizontal, permanece dentro de 120 ms. A alteração é de amplitude, não de tempo.',
     },
     {
+      foco: 'p',
+      tMs: 1700,
+      titulo: 'Compare as duas medidas da mesma onda',
+      texto:
+        'Repita a dupla medida em outro batimento e coloque os dois números lado a lado: a altura ultrapassou o limite de 2,5 mm, e a largura não chegou perto do limite de 120 ms. A onda P tem duas dimensões e apenas uma delas se moveu — guardar qual foi é o que vai separar esta sobrecarga da próxima, em que acontece exatamente o contrário.',
+    },
+    {
       foco: 'sintese',
       tMs: null,
       titulo: 'Nomeie: sobrecarga atrial direita, ou P pulmonale',
@@ -774,6 +781,13 @@ export const ROTEIROS = {
       titulo: 'Meça o PR e repita a medida em outros batimentos',
       texto:
         'Do início da P ao início do complexo há cerca de 7,5 quadradinhos, o que dá aproximadamente 300 ms — bem acima do limite de 200. Agora repita a medida no batimento anterior e no seguinte: o valor é o mesmo.',
+    },
+    {
+      foco: 'intervalos',
+      tMs: 2080,
+      titulo: 'Compare com o traçado normal e pergunte o que faltaria para ser mais grave',
+      texto:
+        'No traçado de referência esse mesmo intervalo media 160 ms; aqui ele quase dobrou. Mas repare no que NÃO mudou: nenhum complexo desapareceu e o valor não oscila de um batimento para o outro. São essas duas ausências que mantêm o quadro no grau mais leve — bastaria um único complexo faltar para a classificação inteira mudar de patamar.',
     },
     {
       foco: 'sintese',
@@ -1032,6 +1046,13 @@ export const ROTEIROS = {
         'As ondas F se repetem a cada 5 quadradinhos, o que corresponde a cerca de 300 por minuto. Os complexos, por sua vez, aparecem na metade dessa cadência, perto de 150 por minuto. A conta fecha: uma em cada duas ondas atriais conduz.',
     },
     {
+      foco: 'ritmo',
+      tMs: null,
+      titulo: 'Compare com o que você veria numa taquicardia supraventricular',
+      texto:
+        'Se você tivesse olhado só os complexos, este traçado seria indistinguível de uma taquicardia supraventricular: regular, estreito, perto de 150 por minuto. A diferença inteira está na linha de base, que ali estaria reta entre um complexo e o outro e aqui não tem trecho isoelétrico nenhum. É por isso que a suspeita começa pela frequência e se resolve olhando o espaço entre os complexos, não os complexos.',
+    },
+    {
       foco: 'sintese',
       tMs: null,
       titulo: 'Nomeie: flutter atrial com condução 2:1',
@@ -1127,9 +1148,9 @@ export const ROTEIROS = {
     {
       foco: 'qrs',
       tMs: 780,
-      titulo: 'Observe a amplitude aumentando até um máximo',
+      titulo: 'Meça a cadência e observe a amplitude crescer até um máximo',
       texto:
-        'Neste trecho os complexos vão crescendo em amplitude, formando um fuso. É a primeira metade do fenômeno que dá nome ao ritmo.',
+        'Neste trecho os complexos vão crescendo em amplitude, formando um fuso: é a primeira metade do fenômeno que dá nome ao ritmo. Meça agora a distância entre dois complexos consecutivos, que é de cerca de 6 quadradinhos, ou 240 ms — o equivalente a aproximadamente 250 por minuto. Numa frequência dessas o tempo de enchimento ventricular praticamente desaparece, e é por isso que a apresentação típica é síncope.',
     },
     {
       foco: 'qrs',

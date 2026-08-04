@@ -81,6 +81,27 @@ Duas decisões de engenharia que não devem ser desfeitas sem entender o porquê
    não é confiável no Chromium; o traçado renderizaria sem cor e sem espessura no Chrome
    Android. Cor e espessura vêm de classe CSS.
 
+## Verificando o conteúdo antes de commitar
+
+O site não tem servidor nem banco: todo o conteúdo clínico mora em módulos
+JavaScript versionados. Isso é ótimo para quem quer ler e editar, e perigoso
+porque nada impede uma questão de entrar com o gabarito fora do intervalo ou
+apontando para um padrão que não existe. Um erro assim não quebra o site — ele
+ensina errado, em silêncio.
+
+```bash
+python tools/verificar.py
+```
+
+O script confere sintaxe de todo o JavaScript, chaves órfãs entre os arquivos,
+índices de gabarito, alternativas duplicadas, roteiros faltando, módulos sem
+família e a regra de que a primeira parada de um roteiro guiado não pode
+entregar o diagnóstico. Sai com código 1 se encontrar erro, então serve em CI.
+
+Ele **não valida medicina**: um gabarito pode passar em todas as checagens
+estruturais e ainda assim estar clinicamente errado. Isso é trabalho de revisão
+humana.
+
 ## Contribuindo
 
 Correção de conteúdo médico é a contribuição mais valiosa aqui. Encontrou um erro clínico,
