@@ -8,6 +8,7 @@
 
 import { PADROES, FAMILIAS, PASSOS, montarRitmo, listarPadroes } from './ecg/library.js';
 import { renderizarTira } from './ecg/engine.js';
+import { criarMonitor } from './ecg/monitor.js';
 import { criarGerador, criarEixo, criarPaquimetro } from './tools.js';
 import { criarAnatomia } from './anatomy.js';
 import * as store from './store.js';
@@ -427,10 +428,10 @@ function telaAula(familia) {
       <h2>Erros que derrubam a maioria</h2>
       <div class="empilha">
         ${m.errosComuns.map((e) => `
-          <div class="cartao cartao--calmo empilha">
-            <h4 style="color:var(--perigo)">${esc(e.erro)}</h4>
-            <p><strong>Por que acontece:</strong> ${esc(e.porQue)}</p>
-            <p><strong>Como evitar:</strong> ${esc(e.comoEvitar)}</p>
+          <div class="erro-item">
+            <h4>${esc(e.erro)}</h4>
+            <p class="erro-saida">${esc(e.comoEvitar)}</p>
+            <p class="erro-porque">${esc(e.porQue)}</p>
           </div>`).join('')}
       </div>
     </section>` : ''}
@@ -471,10 +472,21 @@ function telaPadrao(chave) {
     </section>
 
     <section class="empilha">
-      <h2>1. Observe</h2>
-      <p class="prosa fraco">Cada onda tem cor e nome. Acompanhe o guia: a faixa se move at&eacute; o
-      achado que est&aacute; sendo explicado, para voc&ecirc; nunca ficar procurando onde olhar.</p>
-      ${tiraGuiada(chave)}
+      <h2>1. Veja bater</h2>
+      <p>Antes de medir qualquer coisa, olhe. Este e o ritmo rodando em tempo real,
+      na mesma velocidade em que estaria no monitor do paciente.</p>
+      <div data-monitor-vivo="${chave}"></div>
+      <h3>Agora congelado, com cada onda nomeada</h3>
+      <p>Primeiro veja isto acontecendo. O monitor abaixo est&aacute; batendo em tempo real,
+      na mesma velocidade de um paciente com essa frequ&ecirc;ncia.</p>
+      <div data-monitor-vivo></div>
+
+      <div class="bloco">
+        <h3>Agora onda por onda</h3>
+        <p>O mesmo tra&ccedil;ado, parado e com cada componente na sua cor. A faixa se move at&eacute;
+        o achado que est&aacute; sendo explicado, para voc&ecirc; nunca ficar procurando onde olhar.</p>
+        ${tiraGuiada(chave)}
+      </div>
       ${roteiro.length ? `
       <div class="cartao empilha" data-roteiro>
         <div class="progresso" data-roteiro-prog></div>
@@ -512,7 +524,18 @@ function telaPadrao(chave) {
   </div>`;
 }
 
+function ligarMonitoresVivos(raiz) {
+  for (const alvo of raiz.querySelectorAll('[data-monitor-vivo]')) {
+    const chave = alvo.dataset.monitorVivo;
+    if (!PADROES[chave]) continue;
+    criarMonitor(alvo, montarRitmo(chave), {
+      mmPx: mmPx(), derivacao: PADROES[chave].derivacao, alturaMm: 32,
+    });
+  }
+}
+
 function ligarTelaPadrao(raiz, chave) {
+  ligarMonitoresVivos(raiz);
   const p = PADROES[chave];
 
   raiz.querySelector('[data-voltar]')?.addEventListener('click', () => ir('modulos'));
@@ -525,6 +548,17 @@ function ligarTelaPadrao(raiz, chave) {
     const x = raiz.querySelector('[data-roteiro-texto]');
     const c = raiz.querySelector('[data-roteiro-conta]');
     const g = raiz.querySelector('[data-roteiro-prog]');
+    // Monitor ao vivo. Um por vez: o anterior é destruído para não deixar
+    // requestAnimationFrame e intervalos órfãos rodando em segundo plano.
+    const alvoVivo = raiz.querySelector('[data-monitor-vivo]');
+    if (alvoVivo) {
+      if (window._monitorAtivo) window._monitorAtivo.destruir();
+      window._monitorAtivo = criarMonitor(alvoVivo, montarRitmo(chave), {
+        mmPx: mmPx(),
+        derivacao: PADROES[chave].derivacao,
+      });
+    }
+
     const tiraEl = raiz.querySelector('[data-tira-guiada]');
     const holo = raiz.querySelector('[data-holofote]');
     const holoRot = raiz.querySelector('[data-holofote-rotulo]');

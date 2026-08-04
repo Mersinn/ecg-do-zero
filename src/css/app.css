@@ -37,23 +37,23 @@
 @layer tokens {
   :root {
     /* --- superfícies --- */
-    --papel:        #faf8f5;
-    --papel-2:      #f2eee8;
-    --papel-3:      #e8e2d9;
+    --papel:        #f7f7f6;
+    --papel-2:      #eeeeed;
+    --papel-3:      #e2e2e0;
     --superficie:   #ffffff;
-    --superficie-2: #fbf9f6;
+    --superficie-2: #fafafa;
 
     /* --- tinta --- */
-    --tinta:        #17191c;   /* 15.9:1 sobre --papel */
-    --tinta-2:      #3d434a;   /* 8.9:1  */
-    --tinta-3:      #6b7480;   /* 4.6:1  — mínimo para corpo */
-    --tinta-4:      #99a1ab;   /* só para bordas e traços, nunca texto */
+    --tinta:        #101113;   /* 15.9:1 sobre --papel */
+    --tinta-2:      #3a3d42;   /* 8.9:1  */
+    --tinta-3:      #6a6e75;   /* 4.6:1  — mínimo para corpo */
+    --tinta-4:      #9a9ea4;   /* só para bordas e traços, nunca texto */
 
     /* --- acento: bordô clínico --- */
-    --acento:       #8c2b34;   /* 7.4:1 sobre --papel */
-    --acento-2:     #a8434c;
-    --acento-fraco: #f6e9ea;
-    --acento-borda: #e0bfc2;
+    --acento:       #c2352b;   /* 7.4:1 sobre --papel */
+    --acento-2:     #a52a22;
+    --acento-fraco: #fdeceb;
+    --acento-borda: #f0c4c0;
 
     /* --- sinais semânticos --- */
     --ok:           #1f6b4a;   /* 5.6:1 */
@@ -70,12 +70,12 @@
     --info-borda:   #bcd3e6;
 
     /* --- linhas --- */
-    --linha:        #ded7cd;
-    --linha-2:      #c9c0b3;
-    --linha-forte:  #a8a094;
+    --linha:        #e0e0de;
+    --linha-2:      #c9c9c6;
+    --linha-forte:  #a6a6a2;
 
     /* --- tipografia --- */
-    --ff-titulo: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --ff-titulo: "Geist", "Segoe UI Variable Display", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
     --ff-corpo:  ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     --ff-mono:   ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
@@ -175,9 +175,10 @@
     overflow-x: hidden;
   }
 
-  h1 { font-family: var(--ff-titulo); font-size: var(--t-4); line-height: var(--lh-apertado); font-weight: 600; letter-spacing: -0.02em; }
-  h2 { font-family: var(--ff-titulo); font-size: var(--t-3); line-height: var(--lh-titulo); font-weight: 600; letter-spacing: -0.015em; }
-  h3 { font-family: var(--ff-titulo); font-size: var(--t-2); line-height: var(--lh-titulo); font-weight: 600; }
+  h1 { font-family: var(--ff-titulo); font-size: var(--t-4); line-height: 1.04; font-weight: 660; letter-spacing: -0.035em; }
+  h2 { font-family: var(--ff-titulo); font-size: var(--t-3); line-height: 1.14; font-weight: 640; letter-spacing: -0.025em; }
+  h2 + p, h1 + p { font-size: var(--t-1); color: var(--tinta-2); max-width: 58ch; }
+  h3 { font-family: var(--ff-titulo); font-size: var(--t-2); line-height: 1.2; font-weight: 620; letter-spacing: -0.015em; }
   h4 { font-family: var(--ff-corpo); font-size: var(--t-1); font-weight: 650; letter-spacing: -0.005em; }
 
   p + p { margin-top: var(--e-3); }
@@ -309,6 +310,9 @@
     box-shadow: var(--sombra-1);
   }
   .cartao--calmo { background: var(--superficie-2); box-shadow: none; }
+  /* Agrupar por filete e espaco em vez de empilhar caixas dentro de caixas. */
+  .bloco { padding-block: var(--e-6); border-top: 1px solid var(--linha); }
+  .bloco:first-child { border-top: none; padding-top: 0; }
 
   .cartao-titulo {
     font-family: var(--ff-titulo); font-size: var(--t-2);
@@ -320,10 +324,15 @@
   }
 
   /* --- etiqueta de seção: usada com parcimônia, não como muleta de hierarquia --- */
+  /* Rotulo de secao. Deliberadamente raro: no maximo um a cada tres secoes.
+     Antes havia um em cada bloco, que e o tell mais comum de pagina gerada. */
   .etiqueta {
+    display: inline-flex; align-items: center; gap: var(--e-2);
     font-family: var(--ff-mono); font-size: var(--t--2);
-    letter-spacing: 0.14em; text-transform: uppercase;
-    color: var(--tinta-3);
+    letter-spacing: 0.06em; color: var(--acento); font-weight: 600;
+  }
+  .etiqueta::before {
+    content: ""; width: 14px; height: 2px; background: var(--acento); border-radius: 1px;
   }
 
   /* --- botões --- */
@@ -804,8 +813,68 @@
 /* ==========================================================================
    UTILIDADES
    ========================================================================== */
+/* ==========================================================================
+   MONITOR AO VIVO
+   O traçado varre, apaga e reinicia como um monitor de cabeceira. É movimento
+   motivado: o objeto que estamos ensinando É uma coisa que bate. Ver o sinal
+   nascer em tempo real ensina que aquilo é tempo passando, não um desenho.
+   ========================================================================== */
+@layer ecg {
+  .monitor {
+    border: 1px solid #143244;
+    border-radius: var(--r-3);
+    background: var(--mon-bg);
+    overflow: hidden;
+  }
+  .monitor-topo {
+    display: flex; align-items: center; gap: var(--e-3);
+    padding: var(--e-2) var(--e-3);
+    border-bottom: 1px solid #143244;
+    font-family: var(--ff-mono); font-size: var(--t--2);
+    color: var(--mon-rotulo);
+  }
+  .monitor-lead { font-weight: 700; color: var(--mon-tinta); letter-spacing: 0.08em; }
+  .monitor-calib { color: #4d7a8c; }
+  .monitor-fc {
+    margin-left: auto; display: inline-flex; align-items: center; gap: var(--e-1);
+    color: var(--mon-tinta);
+  }
+  .monitor-fc b { font-size: var(--t-1); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .monitor-coracao {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--mon-tinta); margin-right: var(--e-1);
+  }
+  .monitor-coracao.bate { animation: bater 380ms cubic-bezier(0.2, 0.9, 0.3, 1); }
+  @keyframes bater {
+    0%   { transform: scale(1);   box-shadow: 0 0 0 0 color-mix(in srgb, var(--mon-tinta) 55%, transparent); }
+    28%  { transform: scale(1.7); box-shadow: 0 0 0 7px color-mix(in srgb, var(--mon-tinta) 0%, transparent); }
+    100% { transform: scale(1);   box-shadow: 0 0 0 0 color-mix(in srgb, var(--mon-tinta) 0%, transparent); }
+  }
+
+  .monitor-tela { display: block; width: 100%; height: auto; }
+
+  .monitor-base {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--e-3);
+    padding: var(--e-2) var(--e-3);
+    border-top: 1px solid #143244;
+  }
+  .monitor-btn {
+    min-height: 34px; padding: var(--e-1) var(--e-3);
+    border: 1px solid #1d4457; border-radius: var(--r-2);
+    font-family: var(--ff-mono); font-size: var(--t--2);
+    color: var(--mon-rotulo); background: #0a2130;
+  }
+  .monitor-btn:hover { color: var(--mon-tinta); border-color: var(--mon-tinta); }
+  .monitor-aviso { font-family: var(--ff-mono); font-size: var(--t--2); color: #45697a; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .monitor-coracao.bate { animation: none; }
+  }
+}
+
 @layer utilidades {
-  .mono { font-family: var(--ff-mono); font-variant-numeric: tabular-nums; }
+  .mono, .laudo-valor, .ctrl-valor, output { font-family: var(--ff-mono); font-variant-numeric: tabular-nums; font-feature-settings: 'zero' 1; }
   .fraco { color: var(--tinta-3); }
   .pequeno { font-size: var(--t--1); }
   .miudo { font-size: var(--t--2); }
@@ -813,4 +882,72 @@
   .nowrap { white-space: nowrap; }
   .oculto { display: none !important; }
   .cheio { width: 100%; }
+}
+
+/* ==========================================================================
+   MONITOR AO VIVO E BLOCOS DE ERRO
+   ========================================================================== */
+@layer ecg {
+  .monitor {
+    border: 1px solid #12323f; border-radius: var(--r-3);
+    background: var(--mon-bg); overflow: hidden;
+  }
+  .monitor-topo, .monitor-base {
+    display: flex; align-items: center; gap: var(--e-3);
+    padding: var(--e-2) var(--e-3);
+    font-family: var(--ff-mono); font-size: var(--t--2);
+    color: var(--mon-rotulo);
+  }
+  .monitor-topo { border-bottom: 1px solid #12323f; }
+  .monitor-base { border-top: 1px solid #12323f; justify-content: space-between; }
+  .monitor-lead { color: var(--mon-qrs); font-weight: 700; letter-spacing: 0.08em; }
+  .monitor-calib { margin-left: auto; }
+  .monitor-fc {
+    display: inline-flex; align-items: center; gap: var(--e-2);
+    color: var(--mon-qrs); font-variant-numeric: tabular-nums;
+  }
+  .monitor-fc b { font-size: var(--t-1); }
+  .monitor-coracao {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--mon-qrs); box-shadow: 0 0 7px var(--mon-qrs);
+  }
+  .monitor-coracao.bate { animation: bater 320ms cubic-bezier(0.2, 0.8, 0.3, 1); }
+  @keyframes bater {
+    0%   { transform: scale(1);   opacity: 1; }
+    22%  { transform: scale(1.7); opacity: 1; }
+    100% { transform: scale(1);   opacity: 0.55; }
+  }
+  .monitor-tela { display: block; width: 100%; height: auto; }
+  .monitor-btn {
+    min-height: 32px; padding: 0 var(--e-3);
+    border: 1px solid #1d4d5e; border-radius: var(--r-2);
+    color: var(--mon-rotulo); font-family: var(--ff-mono); font-size: var(--t--2);
+  }
+  .monitor-btn:hover { color: var(--mon-qrs); border-color: var(--mon-qrs); }
+  .monitor-aviso { opacity: 0.6; }
+
+  /* Erros: a saída vem antes da explicação. O aluno precisa da conduta
+     primeiro; o porquê é apoio, não abertura. */
+  .erro-item {
+    padding-block: var(--e-4);
+    border-top: 1px solid var(--linha);
+  }
+  .erro-item:first-child { border-top: none; padding-top: 0; }
+  .erro-item h4 {
+    color: var(--acento); font-size: var(--t-1);
+    font-weight: 640; letter-spacing: -0.01em; margin-bottom: var(--e-2);
+  }
+  .erro-saida { font-size: var(--t-0); color: var(--tinta); }
+  .erro-porque {
+    font-size: var(--t--1); color: var(--tinta-3);
+    margin-top: var(--e-2); padding-left: var(--e-3);
+    border-left: 2px solid var(--linha-2);
+  }
+}
+
+/* Alvos de toque: nenhum controle abaixo de 40 px de altura no celular. */
+@layer ferramentas {
+  @media (pointer: coarse) {
+    .monitor-btn, .btn--pequeno, .anat-botao, select.btn { min-height: var(--toque); }
+  }
 }
