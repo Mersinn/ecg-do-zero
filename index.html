@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ECG Ultimate Learning — aprenda a ler eletrocardiograma do zero</title>
+<meta name="description" content="Curso interativo de eletrocardiograma para estudantes de medicina do ciclo clínico. Traçados manipuláveis, paquímetro, eixo elétrico, casos clínicos e questões comentadas.">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#faf8f5">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%238c2b34'/%3E%3Cpath d='M3 18h5l3-9 4 16 3-11 2 4h9' fill='none' stroke='%23faf8f5' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="./src/css/app.css">
+</head>
+<body>
+<a class="pular-para" href="#principal">Pular para o conteúdo</a>
+
+<div class="casca">
+
+  <header class="topo">
+    <div class="topo-interno">
+      <div class="marca">
+        <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" rx="7" fill="#8c2b34"/>
+          <path d="M3 18h5l3-9 4 16 3-11 2 4h9" fill="none" stroke="#faf8f5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div>
+          <div class="marca-nome">ECG Ultimate Learning</div>
+          <div class="marca-sub">Eletrocardiograma do zero</div>
+        </div>
+      </div>
+      <div class="topo-progresso">
+        <div class="progresso" id="progresso-topo" aria-hidden="true"></div>
+        <span class="progresso-texto" id="progresso-texto">0%</span>
+      </div>
+    </div>
+    <nav class="abas" id="abas" role="tablist" aria-label="Seções do curso"></nav>
+  </header>
+
+  <main class="conteudo" id="principal" tabindex="-1">
+    <div id="vista"></div>
+  </main>
+
+  <footer class="rodape">
+    <div class="rodape-interno prosa empilha">
+      <p>
+        <strong>Os traçados deste site são sintéticos.</strong> São gerados por equações a partir de
+        parâmetros clínicos, para ensinar o padrão de cada diagnóstico — não são registros de
+        pacientes, não têm a variabilidade de um traçado real e não substituem a leitura de um ECG
+        de 12 derivações calibrado. Um padrão aprendido aqui precisa ser reconhecido depois em
+        traçado real, com ruído, artefato e apresentação atípica.
+      </p>
+      <p>
+        Material de estudo produzido por estudante, para estudantes. Não é diretriz, não é fonte
+        primária e não serve para decisão clínica. Onde as fontes do curso divergem entre si ou das
+        diretrizes nacionais, o site mostra a divergência em vez de escolher um lado em silêncio.
+        Encontrou erro? Abra uma <em>issue</em> no repositório — correção de conteúdo médico é a
+        contribuição mais valiosa que existe aqui.
+      </p>
+      <p class="miudo">
+        Feito por Emerson Freitas · Código aberto sob licença MIT ·
+        <a href="https://github.com/Mersinn/ecg-ultimate-learning" rel="noopener">Repositório e correções</a>
+      </p>
+    </div>
+  </footer>
+
+</div>
+
+<script type="module" src="./src/js/app.js"></script>
+<noscript>
+  <div style="padding:2rem;max-width:40rem;margin:0 auto">
+    <h1>JavaScript é necessário</h1>
+    <p>Este site desenha os traçados de eletrocardiograma no seu navegador, em tempo real. Sem
+    JavaScript não há o que mostrar. Ative-o e recarregue a página.</p>
+  </div>
+</noscript>
+</body>
+</html>
