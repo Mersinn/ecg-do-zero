@@ -190,6 +190,13 @@
     --ecg-traco-l:     1.6px;
     --ecg-rotulo:      #8f5648;   /* 5.8 sobre --ecg-bg */
 
+    /* Destaque DENTRO do papel: onda selecionada, cota, marcador de medida.
+       Fica fora da paleta do tema de propósito, pelo mesmo motivo que --ecg-bg
+       e --ecg-grade: o papel de ECG é vermelho e preto no mundo real e não muda
+       porque a interface mudou. O jade da interface tem contraste ruim sobre
+       grade salmão, e o destaque é justamente o que precisa saltar. */
+    --ecg-destaque:    #c2352b;   /* 5.4 sobre --ecg-bg */
+
     /* --- escala escura: o instrumento ---
        --instrumento é a CAIXA do aparelho, grafite quase neutro. --mon-bg é a
        TELA dentro dela, azul-petróleo profundo. Ter os dois separados é o que
