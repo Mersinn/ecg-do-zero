@@ -1321,3 +1321,106 @@
   .loc-bav, .loc-parede { min-width: 0; }
   .loc-bav-dl dd, .loc-parede-deriv { overflow-wrap: anywhere; }
 }
+
+/* ==========================================================================
+   TEMA ESCURO
+   --------------------------------------------------------------------------
+   Paleta definida pelo autor: grafite frio com acento jade. Substitui a casca
+   do produto e NADA MAIS.
+
+   O que NÃO muda, de propósito:
+
+     --ecg-*   o papel de ECG continua claro, com grade salmão e traço preto.
+               É o objeto real. Sobre a página escura ele passa a ser a coisa
+               mais luminosa da tela, que é exatamente onde o olho deve ir.
+     --mon-*   o monitor continua com a própria tela e o próprio verde.
+
+   CONFLITO RESOLVIDO. O jade do acento (#34c9b4) e o verde do traço do monitor
+   (#46f0b9) são vizinhos. Se a interface inteira fosse jade, o traço deixaria
+   de ser a coisa mais viva da tela e viraria mais um elemento decorado. Duas
+   decisões evitam isso: o jade só aparece em marca, filete e estado ativo,
+   nunca em área grande; e o traço do monitor continua mais claro e mais
+   saturado, então mantém a primazia.
+
+   CONTRASTE, calculado par a par sobre --papel #0e1113:
+     --tinta   #eceff1  16,8 : 1     --acento   #34c9b4   8,9 : 1
+     --tinta-2 #a9b1b8   8,7 : 1     --ok       #34c9b4   8,9 : 1
+     --tinta-3 #8f989f   6,3 : 1     --atencao  #e0a53c   9,6 : 1
+                                     --perigo   #e8798c   7,4 : 1
+   Todos passam AA para corpo. --tinta-4 e --linha-forte nunca recebem texto.
+
+   Para voltar ao claro, basta trocar data-tema no <html> para "claro".
+   ========================================================================== */
+@layer tokens {
+  :root {
+    /* superfícies, do que recua ao que se aproxima */
+    --papel-2:      #0a0d0f;
+    --papel:        #0e1113;
+    --superficie:   #15191c;
+    --superficie-2: #1c2125;
+    --papel-3:      #232a2f;
+
+    /* tinta */
+    --tinta:        #eceff1;
+    --tinta-2:      #a9b1b8;
+    --tinta-3:      #8f989f;
+    --tinta-4:      #6b747b;
+
+    /* acento jade */
+    --acento:       #34c9b4;
+    --acento-2:     #5ad9c6;
+    --acento-fraco: #0f2a28;
+    --acento-borda: #1d4a45;
+
+    /* semânticos: os hex do autor, clareados para fundo escuro */
+    --ok:           #34c9b4;
+    --ok-fraco:     #0f2a28;
+    --ok-borda:     #1d4a45;
+    --atencao:      #e0a53c;
+    --atencao-fraco:#2b2113;
+    --atencao-borda:#4d3c1c;
+    --perigo:       #e8798c;
+    --perigo-fraco: #2c1519;
+    --perigo-borda: #50262f;
+    --info:         #7fb6d6;
+    --info-fraco:   #10222c;
+    --info-borda:   #1f4053;
+
+    /* filetes */
+    --linha:        #272d32;
+    --linha-2:      #39424a;
+    --linha-forte:  #55606a;
+
+    /* sombra some no escuro: profundidade vem de nível e filete */
+    --sombra-1: none;
+    --sombra-2: 0 2px 10px rgb(0 0 0 / 0.35);
+    --sombra-3: 0 10px 34px rgb(0 0 0 / 0.5);
+  }
+
+  /* Escape para o claro, se o autor ou um aluno preferir. */
+  :root[data-tema="claro"] {
+    --papel-2: #eae8e4; --papel: #f5f4f1; --superficie: #fdfdfc; --superficie-2: #f8f7f4; --papel-3: #e0ddd8;
+    --tinta: #16181b; --tinta-2: #3a3d42; --tinta-3: #63666c; --tinta-4: #8a8d92;
+    --acento: #c2352b; --acento-2: #a52a22; --acento-fraco: #fbeae8; --acento-borda: #eec3bd;
+    --ok: #1c6446; --ok-fraco: #e6f1ea; --ok-borda: #b5d5c4;
+    --atencao: #7d5205; --atencao-fraco: #f8f0dd; --atencao-borda: #e2cfa4;
+    --perigo: #9c1f16; --perigo-fraco: #faeae8; --perigo-borda: #e5beb9;
+    --info: #1b4a73; --info-fraco: #e7eff6; --info-borda: #b8cfe3;
+    --linha: #e2dfda; --linha-2: #cdc9c3; --linha-forte: #a5a19a;
+  }
+}
+
+@layer ecg {
+  /* A tira de papel ganha moldura e afastamento: sobre fundo escuro ela é a
+     área mais clara da tela, e sem contenção o branco vaza para a página. */
+  .ecg-tira:not(:has(.ecg-monitor)) {
+    border-color: var(--linha-2);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.04), 0 8px 24px rgb(0 0 0 / 0.4);
+  }
+  .ecg-cabeca, .ecg-pe { background: var(--superficie); }
+
+  /* O torso da aba Localizar acompanha a casca, não o papel. */
+  .loc-corpo { fill: var(--superficie-2); stroke: var(--linha-2); }
+  .loc-eletrodo circle { fill: var(--papel-3); stroke: var(--linha-2); }
+  .loc-eletrodo.acesa text { fill: #08201d; }
+}
