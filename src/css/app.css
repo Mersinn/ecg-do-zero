@@ -378,7 +378,7 @@
     overflow-x: hidden;
   }
 
-  h1 { font-family: var(--ff-titulo); font-size: var(--t-4); line-height: 1.04; font-weight: var(--p-forte); letter-spacing: -0.035em; }
+  h1 { font-family: var(--ff-titulo); font-size: var(--t-4); line-height: 1.04; font-weight: var(--p-forte); }
   h2 { font-family: var(--ff-titulo); font-size: var(--t-3); line-height: 1.14; font-weight: var(--p-forte); letter-spacing: -0.025em; }
   h2 + p, h1 + p { font-size: var(--t-1); color: var(--tinta-2); max-width: 58ch; }
   h3 { font-family: var(--ff-titulo); font-size: var(--t-2); line-height: 1.2; font-weight: var(--p-semi); letter-spacing: -0.015em; }

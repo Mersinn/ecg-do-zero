@@ -154,7 +154,7 @@
   h1 {
     font-size: var(--t-4);
     font-weight: var(--p-forte);
-    letter-spacing: -0.032em;
+    letter-spacing: -0.020em;
     line-height: 1.03;
     color: var(--tinta);
     /* CAIXA PRÓPRIA. Sem isto o h1 herdava a medida do texto corrido, que é
@@ -464,7 +464,6 @@
     .cartao-sub, .nota { max-width: none; }
   }
   @layer base {
-    h1 { letter-spacing: -0.03em; }
     h1 + p { font-size: var(--t-1); max-width: none; }
     h2 + p { max-width: none; }
   }
