@@ -1538,6 +1538,41 @@ function ligarQuestoes(raiz) {
 
 const vista = () => document.getElementById('vista');
 
+/* Mantem a aba ativa dentro da faixa horizontal sem delegar a rolagem ao
+   viewport. scrollIntoView tambem pode mover ancestrais no eixo vertical;
+   aqui somente #abas recebe scrollLeft. O numero do pedido descarta uma
+   medicao antiga se o aluno trocar de tela enquanto a fonte ainda carrega. */
+let pedidoAbaVisivel = 0;
+
+function trazerAbaParaFaixa(aba) {
+  const nav = document.getElementById('abas');
+  if (!nav || !aba) return;
+
+  const pedido = ++pedidoAbaVisivel;
+  const ajustar = () => {
+    if (pedido !== pedidoAbaVisivel || aba.getAttribute('aria-selected') !== 'true') return;
+    if (nav.scrollWidth <= nav.clientWidth + 1) return;
+
+    const caixaNav = nav.getBoundingClientRect();
+    const caixaAba = aba.getBoundingClientRect();
+    const estilo = getComputedStyle(nav);
+    const limiteEsquerdo = caixaNav.left + (parseFloat(estilo.paddingLeft) || 0);
+    const limiteDireito = caixaNav.right - (parseFloat(estilo.paddingRight) || 0);
+    let delta = 0;
+
+    if (caixaAba.left < limiteEsquerdo - 1) delta = caixaAba.left - limiteEsquerdo;
+    else if (caixaAba.right > limiteDireito + 1) delta = caixaAba.right - limiteDireito;
+    if (Math.abs(delta) <= 1) return;
+
+    const maximo = Math.max(0, nav.scrollWidth - nav.clientWidth);
+    const esquerda = Math.min(maximo, Math.max(0, nav.scrollLeft + delta));
+    nav.scrollTo({ left: esquerda, behavior: respeitaMovimento() ? 'smooth' : 'auto' });
+  };
+
+  if (document.fonts?.status === 'loading') document.fonts.ready.then(ajustar, ajustar);
+  else ajustar();
+}
+
 /* Quantos segmentos da barra do topo ja estavam cheios na pintura anterior.
    null = ainda nao houve pintura nesta sessao. */
 let segmentosCheiosAntes = null;
@@ -1639,13 +1674,18 @@ function ir(destino, arg) {
   ligarTirasAlternaveis(raiz);
 
   const abaAtiva = (destino === 'padrao' || destino === 'aula') ? 'modulos' : destino;
+  const abaSelecionadaAntes = document.querySelector('.aba[aria-selected="true"]');
+  let botaoAbaAtiva = null;
   for (const t of document.querySelectorAll('.aba')) {
-    t.setAttribute('aria-selected', String(t.dataset.tela === abaAtiva));
+    const ativa = t.dataset.tela === abaAtiva;
+    t.setAttribute('aria-selected', String(ativa));
+    if (ativa) botaoAbaAtiva = t;
   }
 
   if (location.hash.slice(1) !== destino) history.replaceState(null, '', `#${destino}`);
   document.getElementById('principal').focus({ preventScroll: true });
   window.scrollTo({ top: 0, behavior: 'instant' });
+  if (botaoAbaAtiva !== abaSelecionadaAntes) trazerAbaParaFaixa(botaoAbaAtiva);
 
   /* Movimento sempre por ultimo: a tela ja esta montada e ligada, entao o que se
      anima aqui e conteudo final, e nao um esqueleto que ainda vai mudar de
