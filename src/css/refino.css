@@ -1218,3 +1218,106 @@
     .tira-alt-acoes > span { display: none; }
   }
 }
+
+/* ==========================================================================
+   LOCALIZAR: paredes do infarto e os quatro bloqueios
+   O torso e a lista ficam lado a lado só quando há largura real. No iPad
+   retrato e no celular o torso vem primeiro, inteiro, porque é ele que
+   carrega a informação espacial.
+   ========================================================================== */
+@layer ecg {
+  .loc-grade { display: grid; gap: var(--e-5); }
+  @media (min-width: 60rem) { .loc-grade { grid-template-columns: minmax(0, 1fr) minmax(0, 20rem); } }
+
+  .loc-torso { width: 100%; max-width: 30rem; margin-inline: auto; height: auto; }
+  .loc-corpo { fill: var(--superficie); stroke: var(--linha-2); stroke-width: 1.4; }
+  .loc-coracao-forma { fill: var(--acento-fraco); stroke: var(--acento-borda); stroke-width: 1; }
+
+  .loc-eletrodo circle {
+    fill: var(--papel-3); stroke: var(--linha-2); stroke-width: 1;
+    transition: fill 240ms cubic-bezier(0.32, 0.72, 0, 1), stroke 240ms;
+  }
+  .loc-eletrodo text {
+    font-family: var(--ff-mono); font-size: 7.5px; fill: var(--tinta-3);
+    transition: fill 240ms;
+  }
+  .loc-eletrodo.acesa circle { fill: var(--acento); stroke: var(--acento-2); }
+  .loc-eletrodo.acesa text { fill: #fff; font-weight: 700; }
+  .loc-eletrodo.espelho circle { fill: var(--info-fraco); stroke: var(--info); stroke-dasharray: 2 2; }
+  .loc-eletrodo.espelho text { fill: var(--info); font-weight: 700; }
+
+  .loc-lista { display: grid; gap: var(--e-2); align-content: start; }
+  .loc-parede {
+    text-align: left; padding: var(--e-3) var(--e-4);
+    border: 1px solid var(--linha); border-radius: var(--r-2);
+    background: var(--superficie); min-height: var(--toque);
+    transition: all 240ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .loc-parede:hover { border-color: var(--linha-forte); }
+  .loc-parede:active { transform: scale(0.985); }
+  .loc-parede[aria-selected="true"] {
+    background: var(--tinta); border-color: var(--tinta);
+  }
+  .loc-parede-nome { display: block; font-weight: var(--p-semi); font-size: var(--t-0); }
+  .loc-parede-deriv {
+    display: block; font-family: var(--ff-mono); font-size: var(--t--2);
+    color: var(--tinta-3); margin-top: 2px;
+  }
+  .loc-parede[aria-selected="true"] .loc-parede-nome { color: var(--papel); }
+  .loc-parede[aria-selected="true"] .loc-parede-deriv { color: var(--papel-3); }
+
+  .loc-detalhe { margin-top: var(--e-5); max-width: 62ch; }
+  .loc-detalhe h3 { margin-bottom: var(--e-3); }
+  .loc-dl { display: grid; gap: var(--e-1); margin-bottom: var(--e-4); }
+  .loc-dl dt {
+    font-family: var(--ff-mono); font-size: var(--t--2); color: var(--tinta-3);
+    letter-spacing: 0.06em; text-transform: uppercase; margin-top: var(--e-3);
+  }
+  .loc-dl dd { margin: 0; font-size: var(--t-0); }
+
+  .loc-limiares { display: grid; gap: 0; max-width: 44rem; }
+  .loc-limiar {
+    display: flex; justify-content: space-between; align-items: baseline; gap: var(--e-4);
+    padding: var(--e-3) 0; border-bottom: 1px solid var(--linha);
+  }
+  .loc-limiar:last-child { border-bottom: none; }
+  .loc-limiar-quanto { font-weight: var(--p-semi); color: var(--acento-2); white-space: nowrap; }
+
+  .loc-bavs { display: grid; gap: var(--e-3); }
+  @media (min-width: 48rem) { .loc-bavs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .loc-bav {
+    text-align: left; padding: var(--e-4);
+    border: 1px solid var(--linha-2); border-radius: var(--r-3);
+    background: var(--superficie);
+    border-left-width: 3px;
+    transition: all 260ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .loc-bav[data-grav="leve"]  { border-left-color: var(--ok); }
+  .loc-bav[data-grav="grave"] { border-left-color: var(--perigo); }
+  .loc-bav:hover { border-color: var(--linha-forte); transform: translateY(-1px); }
+  .loc-bav:active { transform: scale(0.99); }
+  .loc-bav-nome { display: block; font-weight: var(--p-semi); font-size: var(--t-1); }
+  .loc-bav-pr {
+    display: block; margin: var(--e-2) 0 var(--e-3);
+    font-size: var(--t-0); color: var(--acento-2); font-weight: var(--p-medio);
+  }
+  .loc-bav-dl { display: grid; gap: 2px; margin: 0; }
+  .loc-bav-dl dt {
+    font-family: var(--ff-mono); font-size: var(--t--2); color: var(--tinta-3);
+    letter-spacing: 0.06em; text-transform: uppercase; margin-top: var(--e-2);
+  }
+  .loc-bav-dl dd { margin: 0; font-size: var(--t--1); color: var(--tinta-2); }
+  .loc-bav-ir {
+    display: block; margin-top: var(--e-3);
+    font-size: var(--t--1); color: var(--acento); font-weight: var(--p-medio);
+  }
+}
+
+/* Filho de grid tem min-width auto por padrão, e conteúdo largo o empurra para
+   fora do contêiner. É a causa mais comum de rolagem horizontal em grid. */
+@layer ecg {
+  .loc-grade > * { min-width: 0; }
+  .loc-mapa { min-width: 0; overflow: hidden; }
+  .loc-bav, .loc-parede { min-width: 0; }
+  .loc-bav-dl dd, .loc-parede-deriv { overflow-wrap: anywhere; }
+}

@@ -9,7 +9,12 @@
  * Substitui window.storage, que só existia dentro do runtime de artefato.
  */
 
-const CHAVE = 'ecg-ultimate-learning:v1';
+const CHAVE = 'ecg-do-zero:v1';
+
+/* Chave anterior ao renome do projeto. Quem já tinha progresso salvo não pode
+   perdê-lo só porque o site trocou de nome: lemos a antiga uma vez, gravamos
+   na nova e apagamos a velha. */
+const CHAVE_ANTIGA = 'ecg-ultimate-learning:v1';
 
 const VAZIO = {
   versao: 1,
@@ -24,7 +29,15 @@ let estado = carregar();
 
 function carregar() {
   try {
-    const cru = localStorage.getItem(CHAVE);
+    let cru = localStorage.getItem(CHAVE);
+    if (!cru) {
+      const antigo = localStorage.getItem(CHAVE_ANTIGA);
+      if (antigo) {
+        localStorage.setItem(CHAVE, antigo);
+        localStorage.removeItem(CHAVE_ANTIGA);
+        cru = antigo;
+      }
+    }
     if (!cru) return { ...VAZIO, criadoEm: Date.now() };
     const lido = JSON.parse(cru);
     return { ...VAZIO, ...lido, ajustes: { ...VAZIO.ajustes, ...(lido.ajustes || {}) } };

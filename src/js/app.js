@@ -11,6 +11,7 @@ import { renderizarTira, PAPEL } from './ecg/engine.js';
 import { criarMonitor, criarTiraAlternavel } from './ecg/monitor.js';
 import { criarGerador, criarEixo, criarPaquimetro } from './tools.js';
 import { criarAnatomia } from './anatomy.js';
+import { telaLocalizar, ligarLocalizar } from './screens/localizar.js';
 import { telaPapel, ligarPapel } from './screens/papel.js';
 import { telaPlantao, ligarPlantao } from './screens/plantao.js';
 import { animate, inView, hover, press, scroll, spring, stagger, respeitaMovimento } from './motion.js';
@@ -545,6 +546,7 @@ const TELAS = [
   { id: 'metodo',     rotulo: 'Método' },
   { id: 'papel',      rotulo: 'O papel' },
   { id: 'anatomia',   rotulo: 'Anatomia' },
+  { id: 'localizar',  rotulo: 'Localizar' },
   { id: 'modulos',    rotulo: 'Módulos' },
   { id: 'bancada',    rotulo: 'Bancada' },
   { id: 'plantao',    rotulo: 'Plantão' },
@@ -1605,6 +1607,9 @@ function ir(destino, arg) {
   } else if (destino === 'aula') {
     raiz.innerHTML = telaAula(arg);
     raiz.querySelector('[data-voltar]')?.addEventListener('click', () => ir('modulos'));
+  } else if (destino === 'localizar') {
+    raiz.innerHTML = telaLocalizar();
+    ligarLocalizar(raiz);
   } else if (destino === 'modulos') {
     raiz.innerHTML = telaModulos();
   } else if (destino === 'bancada') {

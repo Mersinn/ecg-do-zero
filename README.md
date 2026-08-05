@@ -81,6 +81,20 @@ Duas decisões de engenharia que não devem ser desfeitas sem entender o porquê
    não é confiável no Chromium; o traçado renderizaria sem cor e sem espessura no Chrome
    Android. Cor e espessura vêm de classe CSS.
 
+## As abas
+
+| Aba | O que faz |
+|---|---|
+| Método | A sequência de nove passos, executável sobre um traçado |
+| O papel | Calibração, quadradinho, quadradão e o pulso de 1 mV |
+| Anatomia | Cada onda ligada à estrutura do coração que a gera, com o impulso animado |
+| Localizar | Parede do infarto por derivação e artéria; os quatro bloqueios AV lado a lado |
+| Módulos | 27 padrões, cada um com aula, leitura guiada e treino |
+| Bancada | Gerador de traçado, eixo elétrico e paquímetro |
+| Plantão | 18 casos clínicos progressivos, com o Freio antes da correção |
+| Questões | 46 questões comentadas |
+| Desempenho | Progresso, fila de revisão e repetição espaçada |
+
 ## Verificando o conteúdo antes de commitar
 
 O site não tem servidor nem banco: todo o conteúdo clínico mora em módulos
