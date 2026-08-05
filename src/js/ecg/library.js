@@ -352,7 +352,7 @@ export const PADROES = {
       adequacao: 'Calibração padrão.',
       ritmo: 'Sinusal.',
       fc: '~72 bpm.',
-      eixo: 'Normal ou desviado para a direita.',
+      eixo: 'Normal. Bloqueio de ramo direito ISOLADO não desvia o eixo; se houver desvio para a direita, pense em bloqueio bifascicular associado (hemibloqueio posterior esquerdo) ou em sobrecarga de ventrículo direito.',
       intervalos: 'PR normal · QRS ≥ 120 ms.',
       qrs: 'Padrão rsR\' em V1 — as "orelhas de coelho". Onda S alargada em DI e V6.',
       st: 'Onda T invertida em V1–V2. Isso é discordância esperada, não isquemia.',
