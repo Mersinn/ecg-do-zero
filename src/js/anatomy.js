@@ -514,7 +514,7 @@ const ESTILO = `
                 stroke 220ms cubic-bezier(0.2, 0.7, 0.3, 1),
                 fill 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
   }
-  .an-svg .peca.ativa { opacity: 1; --ecg-tinta: var(--acento); --ecg-traco-l: 2.6px; }
+  .an-svg .peca.ativa { opacity: 1; --ecg-tinta: var(--ecg-destaque); --ecg-traco-l: 2.6px; }
   .an-svg [data-peca] { cursor: pointer; }
   .an-alvo { fill: none; pointer-events: all; }
 
@@ -681,7 +681,7 @@ const ESTILO = `
      que precisa parecer rápido. Durante a corrida a transição encurta. */
   .an-svg.an-rodando .peca { opacity: 0.13; transition-duration: 70ms; }
   .an-svg.an-rodando .peca.viva {
-    opacity: 1; --ecg-tinta: var(--acento); --ecg-traco-l: 2.6px;
+    opacity: 1; --ecg-tinta: var(--ecg-destaque); --ecg-traco-l: 2.6px;
   }
   .an-svg.an-rodando .peca.viva .an-legenda { fill: var(--tinta); font-weight: 600; }
 
@@ -690,7 +690,7 @@ const ESTILO = `
   .an-svg.an-rodando .ecg-traco:not(.an-fantasma) { clip-path: url(#an-cl-varre); }
 
   .an-caneta {
-    stroke: var(--acento); stroke-width: 1.2px; opacity: 0;
+    stroke: var(--ecg-destaque); stroke-width: 1.2px; opacity: 0;
     vector-effect: non-scaling-stroke;
   }
   .an-svg.an-rodando .an-caneta { opacity: 0.45; }
@@ -702,7 +702,7 @@ const ESTILO = `
   .an-front--t   { fill: var(--pap-t); }
 
   .an-imp {
-    fill: var(--acento); stroke: var(--ecg-bg); stroke-width: 1.4; opacity: 0;
+    fill: var(--ecg-destaque); stroke: var(--ecg-bg); stroke-width: 1.4; opacity: 0;
   }
   .an-espera {
     fill: none; stroke: var(--pap-t); stroke-width: 2.2; opacity: 0;
