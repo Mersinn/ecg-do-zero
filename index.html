@@ -17,6 +17,25 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
+<!-- Fontes auto-hospedadas. O preload vem ANTES da folha de estilo de
+     propósito: sem ele o navegador só descobre o woff2 depois de baixar e
+     analisar o CSS, e o swap acontece tarde, já com o texto desenhado em
+     Segoe UI.
+
+     Só as DUAS famílias que algum seletor usa hoje. A Source Serif 4 está
+     hospedada e declarada em app.css, mas nenhuma regra a chama ainda:
+     dar preload nela gastaria uma conexão do caminho crítico para 49,6 KB que
+     ninguém desenha. Ela entra aqui no dia em que existir a superfície de
+     narrativa sobre papel.
+
+     Das duas Plex Mono, só a 400 é pré-carregada: é a do token --ff-mono e a
+     de toda medida do laudo. A 600 aparece em rótulo curto (.etiqueta,
+     .laudo-chave) e chega a tempo pelo caminho normal.
+
+     `crossorigin` é obrigatório mesmo na mesma origem: sem ele o navegador
+     baixa o arquivo duas vezes, porque fonte é sempre requisição anônima. -->
+<link rel="preload" href="./assets/fonts/instrument-sans-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="./assets/fonts/ibm-plex-mono-latin-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="./src/css/app.css">
 <!-- Refino tipográfico e de responsividade. Vem DEPOIS de app.css de propósito:
      ele corrige defeitos daquela folha sem reescrevê-la. -->
