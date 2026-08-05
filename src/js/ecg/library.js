@@ -528,7 +528,12 @@ export const PADROES = {
       const rr = 240;
       let t = 120;
       let i = 0;
-      const base = ritmoRegular({ fc: 250, duracao: 100 }).eventos[0];
+      // A duracao aqui so serve para colher UM batimento-modelo, que e clonado
+      // com escala e sinal variaveis logo abaixo. Ela precisa caber pelo menos
+      // um evento: o ritmoRegular comeca em t=120 ms e so emite enquanto
+      // 120 + inicioQRS < duracao. Com 100 ms nao saia evento nenhum, eventos[0]
+      // era undefined e a leitura de .modelo derrubava a tela inteira.
+      const base = ritmoRegular({ fc: 250, duracao: 600 }).eventos[0];
       while (t < 5000) {
         const fase = Math.sin((i / 11) * Math.PI * 2);
         const escala = 0.35 + 0.95 * Math.abs(fase);
