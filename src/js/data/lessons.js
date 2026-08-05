@@ -1,5 +1,5 @@
 /**
- * ECG Ultimate Learning — texto didático dos módulos e roteiros de leitura guiada.
+ * ECG do Zero — texto didático dos módulos e roteiros de leitura guiada.
  *
  * Este arquivo é a camada de ENSINO. Ele não sintetiza traçado nem calcula nada:
  * apenas diz o que o aluno precisa entender antes de olhar, e conduz o olhar

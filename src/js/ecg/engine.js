@@ -1,5 +1,5 @@
 /**
- * ECG Ultimate Learning — motor de síntese e renderização de traçados
+ * ECG do Zero — motor de síntese e renderização de traçados
  * ---------------------------------------------------------------------------
  * Os traçados deste app são SINTÉTICOS: gerados por equações, não capturados de
  * um paciente. Servem para ensinar o padrão. Não são laudo nem substituem a

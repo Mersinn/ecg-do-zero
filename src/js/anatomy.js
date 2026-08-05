@@ -493,6 +493,14 @@ const ESTILO = `
   .an-tira { background: var(--ecg-bg); }
   .an-tira .an-svg { width: 100%; height: auto; }
   @media (min-width: 48rem) { .an-tira .an-svg { max-height: 22rem; } }
+  /* iPad deitado tem 768 px de altura, e com o traçado em 22rem o esquema do
+     coração terminava 81 px abaixo da dobra. Como a tela só ensina se os dois
+     estiverem na mesma vista, em janela baixa o traçado cede altura. O corte é
+     por ALTURA de janela e não por largura: quem decide aqui é o quanto de
+     vertical existe, não o quanto de horizontal. */
+  @media (min-width: 48rem) and (max-height: 50rem) {
+    .an-tira .an-svg { max-height: 17rem; }
+  }
 
   .an-linha-base {
     fill: none; stroke: var(--ecg-tinta); stroke-width: 1px;
@@ -539,6 +547,14 @@ const ESTILO = `
   .peca.ativa .an-legenda { fill: var(--tinta); font-weight: 600; }
 
   /* --- navegação por componente --- */
+  /* O botão de repetir divide a linha com as abas em vez de ocupar uma faixa
+     só dele. Cada faixa entre o traçado e o coração é altura que separa a onda
+     do mecanismo, e separar os dois é justamente o que esta tela não pode
+     fazer. Em 375 px ele desce para a linha de baixo, ainda com 44 px. */
+  .an-linha-tabs {
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: var(--e-3) var(--e-4); justify-content: space-between;
+  }
   .an-tabs {
     display: flex; flex-wrap: wrap; gap: var(--e-2);
   }
@@ -558,11 +574,23 @@ const ESTILO = `
   }
 
   /* --- painel --- */
+  /* DUAS COLUNAS JÁ NO iPAD, e não só a partir de 60rem.
+     Empilhado em 834 px o coração caía 575 px abaixo da dobra: dava para ver a
+     onda se desenhando ou o impulso andando, nunca os dois. Como a tela inteira
+     existe para amarrar um ao outro, isso não era questão de conforto, era a
+     promessa quebrada no aparelho que é o alvo principal. A partir de 48rem o
+     coração sobe para o lado do painel, logo abaixo do traçado. */
   .an-baixo { display: grid; gap: var(--e-5); }
+  @media (min-width: 48rem) {
+    .an-baixo {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 15rem);
+      align-items: start;
+    }
+  }
   @media (min-width: 60rem) {
     .an-baixo {
       grid-template-columns: minmax(0, 1fr) minmax(0, 17rem);
-      gap: var(--e-6); align-items: start;
+      gap: var(--e-6);
     }
   }
   .an-painel:focus-visible { outline: 2px solid var(--acento); outline-offset: 6px; }
@@ -608,12 +636,23 @@ const ESTILO = `
   }
   .an-muda p { color: var(--tinta-2); font-size: var(--t--1); }
 
-  .an-coluna-coracao { border-top: 1px solid var(--linha); padding-top: var(--e-5); }
-  @media (min-width: 60rem) {
+  /* Empilhado, o coração vem ANTES do painel de texto. Depois dele, o aluno
+     teria de rolar seiscentos pixels de prosa entre a onda e a estrutura que a
+     produz, e a animação estaria acontecendo fora da tela. A prosa é leitura
+     demorada e pode esperar; o par onda e mecanismo, não. */
+  .an-coluna-coracao {
+    order: -1;
+    border-bottom: 1px solid var(--linha); padding-bottom: var(--e-5);
+  }
+  @media (min-width: 48rem) {
     .an-coluna-coracao {
-      border-top: none; border-left: 1px solid var(--linha);
-      padding-top: 0; padding-left: var(--e-6);
+      order: 0;
+      border-bottom: none; padding-bottom: 0;
+      border-left: 1px solid var(--linha); padding-left: var(--e-5);
     }
+  }
+  @media (min-width: 60rem) {
+    .an-coluna-coracao { padding-left: var(--e-6); }
   }
   .an-estrutura {
     font-family: var(--ff-mono); font-size: var(--t--2);
@@ -629,17 +668,7 @@ const ESTILO = `
 
   /* --- animação do impulso --- */
 
-  .an-controles {
-    display: flex; flex-wrap: wrap; align-items: center;
-    gap: var(--e-3) var(--e-4);
-  }
-  /* Encolher não, quebrar sim. Com flex-shrink a nota espremia para 142 px ao
-     lado do botão em 375 px, virando seis linhas de texto miúdo. Travando a
-     base, ela desce para a linha de baixo e usa a largura inteira. */
-  .an-nota {
-    flex: 1 0 26ch;
-    font-size: var(--t--2); color: var(--tinta-3); max-width: 56ch;
-  }
+  .an-nota { font-size: var(--t--2); color: var(--tinta-3); max-width: 62ch; }
 
   /* Durante a corrida tudo recua e só o que está acontecendo agora fica de pé.
      Estas regras vêm depois das de .peca.ativa de propósito: com a mesma
@@ -886,34 +915,42 @@ export function criarAnatomia(container) {
         sinusal e o intervalo PR ao atraso do nó AV, ler ECG continua sendo decorar desenho.</p>
       </section>
 
-      <div class="ecg-tira an-tira">
-        <div class="ecg-cabeca">
-          <span>Batimento normal · DII</span>
-          <span class="ecg-calib-texto">esquema ampliado, grade ilustrativa</span>
+      <!-- Traçado, abas e esquema são UM bloco, e por isso andam no ritmo
+           interno e não no ritmo de seção. Soltos no empilha-g, cada vão entre
+           eles valia --ritmo-secao, que em 1440 px é 4rem: duas dessas faixas
+           empurravam o coração 176 px para longe do traçado e tiravam o par da
+           tela junto. O vão grande continua existindo onde ele serve, que é
+           entre a abertura, este bloco e a nota. -->
+      <div class="empilha an-bloco">
+        <div class="ecg-tira an-tira">
+          <div class="ecg-cabeca">
+            <span>Batimento normal · DII</span>
+            <span class="ecg-calib-texto">esquema ampliado, grade ilustrativa</span>
+          </div>
+          ${batimentoSVG()}
         </div>
-        ${batimentoSVG()}
-      </div>
 
-      <div class="an-controles">
-        <button class="btn btn--contorno" type="button" data-repetir hidden>Repetir a animação</button>
-        <p class="an-nota" data-nota></p>
-      </div>
+        <div class="an-linha-tabs">
+          <div class="an-tabs" role="tablist" aria-label="Componentes do batimento">
+            ${PECAS.map((p, i) => `<button class="an-tab" type="button" role="tab"
+                id="${idTab(i)}" data-peca="${i}" aria-controls="an-painel"
+                aria-selected="${i === 0}" tabindex="${i === 0 ? '0' : '-1'}">${p.rotulo}</button>`).join('')}
+          </div>
+          <button class="btn btn--contorno" type="button" data-repetir hidden>Repetir a animação</button>
+        </div>
 
-      <div class="an-tabs" role="tablist" aria-label="Componentes do batimento">
-        ${PECAS.map((p, i) => `<button class="an-tab" type="button" role="tab"
-            id="${idTab(i)}" data-peca="${i}" aria-controls="an-painel"
-            aria-selected="${i === 0}" tabindex="${i === 0 ? '0' : '-1'}">${p.rotulo}</button>`).join('')}
-      </div>
+        <div class="an-baixo">
+          <div class="an-painel" id="an-painel" role="tabpanel" tabindex="0"
+               aria-labelledby="${idTab(0)}"></div>
 
-      <div class="an-baixo">
-        <div class="an-painel" id="an-painel" role="tabpanel" tabindex="0"
-             aria-labelledby="${idTab(0)}"></div>
-
-        <div class="an-coluna-coracao">
-          ${coracaoSVG()}
-          <p class="an-estrutura" data-estrutura></p>
+          <div class="an-coluna-coracao">
+            ${coracaoSVG()}
+            <p class="an-estrutura" data-estrutura></p>
+          </div>
         </div>
       </div>
+
+      <p class="an-nota" data-nota></p>
     </div>`;
 
   // Os ouvintes vão na raiz INTERNA, não no contêiner. O contêiner é o #vista da

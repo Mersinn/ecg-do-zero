@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ECG Ultimate Learning: aprenda a ler eletrocardiograma do zero</title>
+<title>ECG do Zero: aprenda a ler eletrocardiograma</title>
 <meta name="description" content="Curso interativo de eletrocardiograma para estudantes de medicina do ciclo clínico. Traçados manipuláveis, paquímetro, eixo elétrico, casos clínicos e questões comentadas.">
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#f5f4f1">
 <!-- Favicon: recorte da marca. Em 16 px o ciclo inteiro vira borrão, então o
      ícone mostra o trecho que se reconhece sozinho: q, R, S, ST e T. -->
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='13 -1.5 27 27'%3E%3Cpath d='M13 14.5H16.6L18.2 17.7L20.8 3.9L23.2 20.1L25.4 14.5H28.2q3.6 -6.9 7.2 0H39' fill='none' stroke='%23c2352b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='4' width='30' height='24' rx='5' fill='%230d1b21'/%3E%3Cpath d='M4 18.6h4.5q1.4-3 2.7 0h1.2l.9-5L16 23.4l1.5-4.8h2.6q1.4-3 2.7 0h1.2l.9-5L27.4 23' fill='none' stroke='%2346f0b9' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='27.4' cy='23' r='2.4' fill='%239dffe0'/%3E%3C/svg%3E">
 <meta property="og:type" content="website">
-<meta property="og:title" content="ECG Ultimate Learning">
-<meta property="og:description" content="Aprenda a ler eletrocardiograma do zero. 27 padrões, 46 questões e 18 casos clínicos, com traçado que bate ao vivo.">
+<meta property="og:title" content="ECG do Zero">
+<meta property="og:description" content="Aprenda a ler eletrocardiograma de verdade, do primeiro traçado à conduta. 27 padrões, 46 questões e 18 casos clínicos, com traçado que bate ao vivo.">
 <meta property="og:image" content="/public/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -30,24 +30,23 @@
   <header class="topo">
     <div class="topo-interno">
       <div class="marca">
-        <!-- Marca: um ciclo de ECG completo. O traço é grafite e só o QRS é
-             vermelho, porque o pico é a assinatura do objeto. São dois path
-             exatamente sobrepostos; a pintura mora em refino.css, bloco 5, e
-             o stroke="currentColor" fica de rede de segurança. -->
-        <svg class="marca-mark" viewBox="0 0 40 24" height="22" role="img"
-             aria-label="ECG Ultimate Learning" focusable="false">
-          <path class="marca-traco"
-                d="M1 14.5H8q3 -5.3 6 0H16.6L18.2 17.7L20.8 3.9L23.2 20.1L25.4 14.5H28.2q3.6 -6.9 7.2 0H39"
-                fill="none" stroke="currentColor" stroke-width="2.4"
+        <svg class="marca-mark" viewBox="0 0 32 32" height="26" role="img"
+             aria-label="ECG do Zero" focusable="false">
+          <rect x="1" y="4" width="30" height="24" rx="5" fill="#0d1b21"/>
+          <g stroke="#2f7c92" stroke-width=".6" opacity=".28">
+            <path d="M9 4V28M16 4V28M23 4V28M1 10H31M1 16H31M1 22H31"/>
+          </g>
+          <path d="M3.4 18.6h3.4q1.2-2.5 2.3 0h1l.8-4.4L14.6 23l1.3-4.4h1.6"
+                fill="none" stroke="#46f0b9" stroke-width="1.7" opacity=".3"
                 stroke-linecap="round" stroke-linejoin="round"/>
-          <path class="marca-pico"
-                d="M16.6 14.5L18.2 17.7L20.8 3.9L23.2 20.1L25.4 14.5"
-                fill="none" stroke="currentColor" stroke-width="2.4"
-                stroke-linecap="butt" stroke-linejoin="round"/>
+          <path d="M19.6 18.6h1.1q1.2-2.5 2.3 0h1l.8-4.4L27.4 23"
+                fill="none" stroke="#46f0b9" stroke-width="1.9"
+                stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="27.4" cy="23" r="1.8" fill="#9dffe0"/>
         </svg>
         <div>
-          <div class="marca-nome">ECG Ultimate Learning</div>
-          <div class="marca-sub">Eletrocardiograma do zero</div>
+          <div class="marca-nome">ECG do Zero</div>
+          <div class="marca-sub">para o ciclo clínico</div>
         </div>
       </div>
       <div class="topo-progresso">

@@ -18,6 +18,7 @@
  */
 
 import { FAMILIAS } from '../ecg/library.js';
+import { criarTiraAlternavel } from '../ecg/monitor.js';
 
 /* ==========================================================================
    TEXTO
@@ -139,7 +140,9 @@ export function telaPlantao(CASOS = [], PADROES = {}) {
  * @param {HTMLElement} raiz  o contêiner da vista
  * @param {object} ctx
  *   CASOS, PADROES        bancos já carregados
- *   montarRitmo, renderizarTira, criarMonitor  motor de traçado
+ *   montarRitmo, criarMonitor  motor de traçado. renderizarTira não é mais
+ *                         usado aqui: a tira do caso passou a ser montada por
+ *                         criarTiraAlternavel, em ecg/monitor.js
  *   store                 progresso; usa registrarCaso e exportar
  *   mmPx                  px por milímetro, número ou função
  *   MOVIMENTOS            opcional; taxonomia de erro de data/cases.js
@@ -151,7 +154,6 @@ export function ligarPlantao(raiz, ctx = {}) {
     CASOS = [],
     PADROES = {},
     montarRitmo,
-    renderizarTira,
     criarMonitor,
     store,
     MOVIMENTOS,
@@ -215,36 +217,32 @@ export function ligarPlantao(raiz, ctx = {}) {
 
   /* ------------------------------------------------------------- traçado -- */
 
-  function tiraPapel(chave) {
-    const p = PADROES[chave] || {};
-    const derivacao = p.derivacao || 'DII';
-    // O nome do padrão fica de fora do cabeçalho de propósito: escrever o
-    // diagnóstico ao lado do traçado do caso responderia a primeira decisão.
-    const svg = renderizarTira(montarRitmo(chave), {
-      estilo: 'papel', mmPx: pxMm(), alturaMm: 40, derivacao, id: `caso-${chave}`,
-    });
-    return `<div class="ecg-tira">
-      <div class="ecg-cabeca"><span>tira de ritmo</span><span class="ecg-calib-texto">25 mm/s · 10 mm/mV</span></div>
-      <div class="ecg-scroller" tabindex="0" role="group" aria-label="Traçado deste caso, derivação ${esc(derivacao)}. Role para o lado para ver a tira inteira.">${svg}</div>
-      <div class="ecg-dica-rolagem" data-toque-apenas>Arraste para o lado para ver a tira inteira. A escala do papel não muda.</div>
-    </div>`;
-  }
-
-  function desenharTracado(caso, comoMonitor) {
+  /**
+   * O traçado do caso, com o alternador papel e monitor.
+   *
+   * O alternador era escrito à mão aqui dentro, com um botão próprio no corpo
+   * do caso e um ramo de if no ouvinte de clique lá embaixo. Ele virou
+   * criarTiraAlternavel, em ecg/monitor.js, e agora é o mesmo componente que
+   * qualquer outra tela do app usa.
+   *
+   * O nome do padrão continua fora do cabeçalho de propósito: escrever o
+   * diagnóstico ao lado do traçado responderia a primeira decisão do caso.
+   */
+  function desenharTracado(caso) {
     const alvo = palco.querySelector('[data-tracado]');
     if (!alvo || !caso.padrao) return;
     matarMonitor();
     try {
-      if (comoMonitor && typeof criarMonitor === 'function') {
-        alvo.innerHTML = '<div data-monitor-alvo></div>';
-        monitorVivo = criarMonitor(
-          alvo.querySelector('[data-monitor-alvo]'),
-          montarRitmo(caso.padrao),
-          { mmPx: pxMm(), derivacao: PADROES[caso.padrao]?.derivacao || 'DII' },
-        );
-      } else {
-        alvo.innerHTML = tiraPapel(caso.padrao);
-      }
+      monitorVivo = criarTiraAlternavel(alvo, montarRitmo(caso.padrao), {
+        mmPx: pxMm(),
+        alturaMm: 40,
+        derivacao: PADROES[caso.padrao]?.derivacao || 'DII',
+        titulo: 'tira de ritmo',
+        id: `caso-${caso.padrao}`,
+        // A fábrica vem do app, que registra o monitor no próprio controle de
+        // vida: trocar de aba no meio do caso precisa matar a animação.
+        fabricaMonitor: typeof criarMonitor === 'function' ? criarMonitor : undefined,
+      });
     } catch {
       alvo.innerHTML = '<p class="pequeno fraco">Não consegui desenhar este traçado neste aparelho. O caso continua acessível pelos dados acima.</p>';
     }
@@ -284,9 +282,6 @@ export function ligarPlantao(raiz, ctx = {}) {
         <h2 style="font-size:var(--t-1)">O traçado que veio junto</h2>
         <div data-tracado></div>
         ${caso.notaTracado ? `<p class="prosa pequeno fraco">${esc(caso.notaTracado)}</p>` : ''}
-        <div class="linha">
-          <button class="btn btn--contorno btn--pequeno" type="button" data-alternar-tracado aria-pressed="false">Ver batendo no monitor</button>
-        </div>
       </section>` : ''}
 
       <section class="empilha" style="border-top:1px solid var(--linha-2);padding-top:var(--e-6)">
@@ -485,7 +480,7 @@ export function ligarPlantao(raiz, ctx = {}) {
     matarMonitor();
     atual = { caso, i: 0, respostas: [] };
     palco.innerHTML = corpoCaso(caso);
-    if (caso.padrao) desenharTracado(caso, false);
+    if (caso.padrao) desenharTracado(caso);
     pintarDecisao();
     aoTopo();
     focar('[data-titulo-caso]');
@@ -520,16 +515,8 @@ export function ligarPlantao(raiz, ctx = {}) {
 
     if (alvo.closest('[data-avancar]')) { if (atual) avancar(); return; }
 
-    // O seletor precisa ser este e não [data-monitor]: monitor.js marca o
-    // próprio contêiner com data-monitor, e o botão Pausar de dentro dele
-    // acabaria trocando o traçado inteiro a cada clique.
-    const btnMonitor = alvo.closest('[data-alternar-tracado]');
-    if (btnMonitor && atual) {
-      const ligar = btnMonitor.getAttribute('aria-pressed') !== 'true';
-      btnMonitor.setAttribute('aria-pressed', String(ligar));
-      btnMonitor.textContent = ligar ? 'Ver como papel impresso' : 'Ver batendo no monitor';
-      desenharTracado(atual.caso, ligar);
-    }
+    // O botão de alternar papel e monitor não aparece aqui: ele pertence à
+    // própria tira, e criarTiraAlternavel cuida dele.
   });
 
   // Enter no campo do Freio abre a correção, como faria o botão.

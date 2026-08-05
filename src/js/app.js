@@ -8,7 +8,7 @@
 
 import { PADROES, FAMILIAS, PASSOS, montarRitmo } from './ecg/library.js';
 import { renderizarTira, PAPEL } from './ecg/engine.js';
-import { criarMonitor } from './ecg/monitor.js';
+import { criarMonitor, criarTiraAlternavel } from './ecg/monitor.js';
 import { criarGerador, criarEixo, criarPaquimetro } from './tools.js';
 import { criarAnatomia } from './anatomy.js';
 import { telaPapel, ligarPapel } from './screens/papel.js';
@@ -101,17 +101,42 @@ const embaralhar = (a) => {
   return b;
 };
 
-/** Tira renderizada dentro do contêiner rolável, com cabeçalho e rodapé. */
-function tira(chave, { estilo = 'papel', altura = 40 } = {}) {
+/**
+ * Marca o lugar de uma tira que pode ser vista como papel ou como monitor.
+ *
+ * Devolve só o buraco. Quem preenche é ligarTirasAlternaveis, logo abaixo,
+ * chamada uma vez por navegação: assim qualquer tela do app ganha o alternador
+ * só por escrever este marcador no HTML, sem repetir a fiação.
+ */
+function tira(chave, { altura = 40 } = {}) {
   const p = PADROES[chave];
-  const svg = renderizarTira(montarRitmo(chave), {
-    estilo, mmPx: mmPx(), alturaMm: altura, derivacao: p.derivacao, id: chave,
-  });
-  return `<div class="ecg-tira">
-    <div class="ecg-cabeca"><span>${esc(p.nome)}</span><span class="ecg-calib-texto">25 mm/s · 10 mm/mV</span></div>
-    <div class="ecg-scroller" tabindex="0" role="group" aria-label="Traçado de ${esc(p.nome)}. Role para ver a tira inteira.">${svg}</div>
-    <div class="ecg-dica-rolagem" data-toque-apenas>Arraste para o lado para ver a tira inteira. A escala do papel não muda.</div>
-  </div>`;
+  if (!p) return '';
+  return `<div data-tira-alt="${chave}" data-tira-altura="${altura}" data-tira-titulo="${esc(p.nome)}"></div>`;
+}
+
+/**
+ * Preenche todos os marcadores de tira alternável da tela atual.
+ *
+ * Cada tira volta registrada em monitoresVivos: quando ela estiver no modo
+ * monitor e o aluno trocar de aba, a animação morre junto com a vista, pelo
+ * mesmo caminho dos monitores criados diretamente.
+ */
+function ligarTirasAlternaveis(raiz) {
+  for (const alvo of raiz.querySelectorAll('[data-tira-alt]')) {
+    const chave = alvo.dataset.tiraAlt;
+    if (!PADROES[chave]) continue;
+    try {
+      monitoresVivos.add(criarTiraAlternavel(alvo, montarRitmo(chave), {
+        mmPx: mmPx(),
+        alturaMm: Number(alvo.dataset.tiraAltura) || 40,
+        derivacao: PADROES[chave].derivacao,
+        titulo: alvo.dataset.tiraTitulo || PADROES[chave].nome,
+        id: `alt-${chave}`,
+      }));
+    } catch {
+      alvo.innerHTML = '<p class="pequeno fraco">Não consegui desenhar este traçado neste aparelho.</p>';
+    }
+  }
 }
 
 /**
@@ -634,7 +659,7 @@ function telaMetodo() {
     </section>
 
     ${exemplos.length ? `
-    <section class="empilha">
+    <section class="empilha" data-metodo-secao>
       <h2>Percorra a sequência uma vez, inteira, sobre um traçado</h2>
       <p class="prosa fraco">Ler a lista dos nove passos não ensina a usá-los. O que ensina é
       executá-los uma vez, na ordem, com um traçado na frente. Em cada passo você vê o que
@@ -893,14 +918,18 @@ function ligarMetodo(raiz) {
     pintar();
   });
 
-  /* Um ouvinte só, no cartão inteiro: os botões de desvio são recriados a cada
-     passo, então ligar um por um deixaria ouvintes órfãos a cada troca. Os que
-     têm data-padrao já são atendidos pela delegação global de iniciar(). */
-  raiz.addEventListener('click', (ev) => {
+  /* Um ouvinte só, na SEÇÃO: os botões de desvio e o de exemplo são recriados
+     a cada passo, então ligar um por um deixaria ouvintes órfãos a cada troca.
+     E ele fica na seção, não em #vista: #vista sobrevive à navegação, e um
+     ouvinte pendurado nela se acumularia a cada volta ao Método até um clique
+     disparar N vezes. Os botões com data-padrao já são atendidos pela
+     delegação global de iniciar(). */
+  const secao = raiz.querySelector('[data-metodo-secao]') || palco;
+  secao.addEventListener('click', (ev) => {
     const exemplo = ev.target.closest('[data-metodo-exemplo]');
     if (exemplo) {
       chave = exemplo.dataset.metodoExemplo;
-      for (const b of raiz.querySelectorAll('[data-metodo-exemplo]')) {
+      for (const b of secao.querySelectorAll('[data-metodo-exemplo]')) {
         b.setAttribute('aria-pressed', String(b === exemplo));
       }
       desenharTira();
@@ -1599,6 +1628,10 @@ function ir(destino, arg) {
     raiz.innerHTML = telaDesempenho();
     ligarDesempenho(raiz);
   }
+
+  // Uma passagem só, depois que a tela já montou o HTML: qualquer marcador
+  // [data-tira-alt] vira uma tira com alternador papel e monitor.
+  ligarTirasAlternaveis(raiz);
 
   const abaAtiva = (destino === 'padrao' || destino === 'aula') ? 'modulos' : destino;
   for (const t of document.querySelectorAll('.aba')) {

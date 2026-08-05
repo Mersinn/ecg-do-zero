@@ -1,5 +1,5 @@
 /**
- * Banco de questões de múltipla escolha — ECG Ultimate Learning.
+ * Banco de questões de múltipla escolha — ECG do Zero.
  *
  * Regras que este arquivo respeita:
  *  - `familia` sempre corresponde a uma chave de FAMILIAS em ecg/library.js

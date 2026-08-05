@@ -157,12 +157,17 @@
     letter-spacing: -0.032em;
     line-height: 1.03;
     color: var(--tinta);
-    /* CAIXA PRÓPRIA. Sem isto o h1 herdava a medida do texto corrido
-       (68ch medidos no corpo, cerca de 590 px) e, com 46 px de corpo, cabiam
-       25 caracteres por linha: o título de tela quebrava em quatro linhas em
-       1440 px. Com 24ch medidos NO PRÓPRIO h1 a caixa acompanha o tamanho da
-       fonte, e o título mais longo do app, "Pré-excitação (Wolff-Parkinson-
-       White)", com 37 caracteres, fecha em 2 linhas nos três alvos. */
+    /* CAIXA PRÓPRIA. Sem isto o h1 herdava a medida do texto corrido, que é
+       medida em ch do CORPO e não do título: a caixa não crescia junto com a
+       fonte, e em 1440 px sobravam cerca de 25 caracteres por linha para um
+       tipo de 46 px. Com 24ch medidos NO PRÓPRIO h1 a caixa acompanha o
+       tamanho da fonte.
+
+       Medido nos três alvos, com o título mais longo do app
+       ("Pré-excitação (Wolff-Parkinson-White)", 37 caracteres):
+         1440 px  2 linhas   |  834 px  2 linhas  |  375 px  2 linhas
+       O pior caso em 375 px é "IAM com supradesnivelamento de ST", que fecha
+       em 3. Nenhum título passa de 3 linhas em nenhum dos três alvos. */
     max-width: var(--medida-titulo);
     text-wrap: balance;
   }
@@ -564,14 +569,18 @@
 @layer layout {
   .marca { gap: var(--e-3); align-items: center; min-width: 0; }
 
+  /* A marca tem cores proprias no SVG (tela escura, traco verde). Nao herda
+     mais do acento: um monitor ligado nao muda de cor conforme o tema. */
   .marca-mark {
     flex: 0 0 auto;
     height: 22px;
     width: auto;
-    color: var(--acento);   /* rede: se a pintura por classe falhar, currentColor */
+       /* rede: se a pintura por classe falhar, currentColor */
     overflow: visible;
   }
-  @media (min-width: 48rem) { .marca-mark { height: 25px; } }
+  @media (min-width: 48rem) { /* A marca tem cores proprias no SVG (tela escura, traco verde). Nao herda
+     mais do acento: um monitor ligado nao muda de cor conforme o tema. */
+  .marca-mark { height: 25px; } }
 
   /* A pintura mora aqui, em classe, como todo SVG do projeto. Regra de folha
      de estilo vence atributo de apresentação, então o stroke="currentColor"
@@ -819,7 +828,7 @@
 }
 
 /* ==========================================================================
-   BLOCO 7 . PROFUNDIDADE POR NÍVEL DE SUPERFÍCIE
+   BLOCO 10 . PROFUNDIDADE POR NÍVEL DE SUPERFÍCIE
    --------------------------------------------------------------------------
    DEFEITO: tudo vivia no mesmo plano. Papel quase branco, cartão branco,
    faixa de abas quase branca, um filete só. A tela inteira era uma folha, e o
@@ -876,7 +885,7 @@
 }
 
 /* ==========================================================================
-   BLOCO 8 . DESKTOP
+   BLOCO 11 . DESKTOP
    --------------------------------------------------------------------------
    DEFEITO relatado pelo autor: "a versão de desktop parece site de criança".
    Concretamente, em 1440 px:
@@ -950,7 +959,9 @@
       margin-inline: 0;
       padding: var(--e-6) var(--e-5) var(--e-5);
     }
-    .marca-mark { height: 26px; }
+    /* A marca tem cores proprias no SVG (tela escura, traco verde). Nao herda
+     mais do acento: um monitor ligado nao muda de cor conforme o tema. */
+  .marca-mark { height: 26px; }
     /* Numa coluna de 16,5 rem sobram cerca de 176 px para o nome depois do
        mark. Em --t-0 ele cabe em uma linha; a quebra fica liberada como rede,
        porque o nowrap herdado do cabeçalho horizontal transbordaria a trilha
@@ -1129,7 +1140,7 @@
 }
 
 /* ==========================================================================
-   BLOCO 9 . iPAD, O ALVO PRIMÁRIO
+   BLOCO 12 . iPAD, O ALVO PRIMÁRIO
    --------------------------------------------------------------------------
    768 a 1024 px. Aqui a faixa de abas horizontal continua sendo o certo: são
    oito seções, e uma trilha lateral comeria um quinto de uma tela de 834 px.
@@ -1144,13 +1155,15 @@
   }
   @layer refino {
     .grade-auto { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-5); }
-    [data-passos] {
+    /* Ver a nota do bloco de desktop: .empilha exclui a barra de progresso do
+       Plantão, que também carrega data-passos. */
+    .empilha[data-passos] {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: var(--e-3);
       align-items: start;
     }
-    [data-passos] > * + * { margin-top: 0; }
+    .empilha[data-passos] > * + * { margin-top: 0; }
   }
 }
 
@@ -1185,4 +1198,23 @@
     font-weight: var(--p-semi);
   }
   .btn--contorno[aria-pressed="true"]:hover { background: var(--tinta-2); border-color: var(--tinta-2); }
+}
+
+/* ==========================================================================
+   BLOCO 8 . TIRA ALTERNÁVEL, EM QUALQUER TELA
+   O alternador papel e monitor existia só na aba Plantão. As duas linguagens
+   têm funções diferentes e as duas ficam, então ele virou componente e passou
+   a valer para toda tira do app. Ver criarTiraAlternavel em ecg/monitor.js.
+   ========================================================================== */
+@layer ecg {
+  .tira-alt { display: grid; gap: var(--e-3); }
+  .tira-alt-acoes {
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: var(--e-2) var(--e-3);
+  }
+  /* A frase que explica a troca some no celular: lá o botão precisa da linha
+     inteira, e o rótulo dele já diz para onde a troca leva. */
+  @media (max-width: 30rem) {
+    .tira-alt-acoes > span { display: none; }
+  }
 }

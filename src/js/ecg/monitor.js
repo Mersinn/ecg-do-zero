@@ -15,7 +15,7 @@
  * paciente.
  */
 
-import { amostrar, PAPEL } from './engine.js';
+import { amostrar, PAPEL, renderizarTira } from './engine.js';
 
 const PASSO_MS = 1; // mesmo passo de amostragem do motor
 
@@ -229,5 +229,107 @@ export function criarMonitor(container, ritmo, opts = {}) {
       if (pulsoTimer) clearInterval(pulsoTimer);
       document.removeEventListener('visibilitychange', aoTrocarAba);
     },
+  };
+}
+
+
+/* ==========================================================================
+   TIRA ALTERNÁVEL: papel impresso ou monitor de cabeceira, no mesmo lugar
+   ========================================================================== */
+
+/**
+ * As duas linguagens visuais do traçado, com um botão entre elas.
+ *
+ * O alternador existia numa tela só, a do Plantão, escrito à mão lá dentro.
+ * Ele não é um detalhe daquela tela: as duas linguagens têm funções
+ * diferentes e as duas ficam. O papel é o que chega na sua mão e é onde se
+ * mede; o monitor é onde se entende que aquilo bate agora. Poder trocar entre
+ * as duas em qualquer tira do app é o ponto, então o alternador saiu de lá e
+ * virou isto.
+ *
+ * Devolve `{ destruir }`, a mesma assinatura de criarMonitor, para que a tela
+ * dona mate a animação na troca de aba pelo mesmo caminho de sempre.
+ *
+ * @param {HTMLElement} container
+ * @param {object} ritmo
+ * @param {object} opts
+ *   mmPx, alturaMm, derivacao — geometria, igual ao renderizarTira
+ *   titulo          — o que aparece no cabeçalho da tira de papel
+ *   id              — sufixo do padrão de grade do SVG, precisa ser único na página
+ *   monitorPrimeiro — abre já no monitor
+ *   fabricaMonitor  — permite injetar um criarMonitor que a tela registra no
+ *                     próprio controle de vida
+ */
+export function criarTiraAlternavel(container, ritmo, opts = {}) {
+  const {
+    mmPx = 3,
+    alturaMm = 40,
+    derivacao = 'DII',
+    titulo = 'tira de ritmo',
+    id = '',
+    monitorPrimeiro = false,
+    fabricaMonitor = criarMonitor,
+  } = opts;
+
+  const limpo = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const rotulo = limpo(titulo);
+  const lead = limpo(derivacao);
+
+  let monitor = null;
+  let noMonitor = Boolean(monitorPrimeiro);
+
+  container.innerHTML = `
+    <div class="tira-alt">
+      <div data-tira-alvo></div>
+      <div class="tira-alt-acoes">
+        <button class="btn btn--contorno btn--pequeno" type="button" data-tira-alternar aria-pressed="false"></button>
+        <span class="miudo fraco">O papel é onde se mede. O monitor é onde se vê bater.</span>
+      </div>
+    </div>`;
+
+  const alvo = container.querySelector('[data-tira-alvo]');
+  const botao = container.querySelector('[data-tira-alternar]');
+
+  const matar = () => {
+    try { if (monitor) monitor.destruir(); } catch { /* já morto */ }
+    monitor = null;
+  };
+
+  function comoPapel() {
+    const svg = renderizarTira(ritmo, { estilo: 'papel', mmPx, alturaMm, derivacao, id });
+    alvo.innerHTML = `<div class="ecg-tira">
+      <div class="ecg-cabeca">
+        <span>${rotulo}</span>
+        <span class="ecg-calib-texto">${PAPEL.velocidade} mm/s · ${PAPEL.ganho} mm/mV</span>
+      </div>
+      <div class="ecg-scroller" tabindex="0" role="group"
+           aria-label="${rotulo}, derivação ${lead}. Role para o lado para ver a tira inteira.">${svg}</div>
+      <div class="ecg-dica-rolagem" data-toque-apenas>Arraste para o lado para ver a tira inteira. A escala do papel não muda.</div>
+    </div>`;
+  }
+
+  function desenhar() {
+    matar();
+    try {
+      if (noMonitor) {
+        alvo.innerHTML = '<div data-monitor-alvo></div>';
+        monitor = fabricaMonitor(alvo.querySelector('[data-monitor-alvo]'), ritmo, { mmPx, derivacao });
+      } else {
+        comoPapel();
+      }
+    } catch {
+      alvo.innerHTML = '<p class="pequeno fraco">Não consegui desenhar este traçado neste aparelho.</p>';
+    }
+    botao.textContent = noMonitor ? 'Ver como papel impresso' : 'Ver batendo no monitor';
+    botao.setAttribute('aria-pressed', String(noMonitor));
+  }
+
+  botao.addEventListener('click', () => { noMonitor = !noMonitor; desenhar(); });
+
+  desenhar();
+
+  return {
+    destruir: matar,
+    alternar() { noMonitor = !noMonitor; desenhar(); },
   };
 }

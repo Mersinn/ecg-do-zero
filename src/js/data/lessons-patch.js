@@ -1,5 +1,5 @@
 /**
- * ECG Ultimate Learning: patch de calibragem pedagógica sobre `lessons.js`.
+ * ECG do Zero: patch de calibragem pedagógica sobre `lessons.js`.
  *
  * Este arquivo NÃO substitui `lessons.js`. Ele corrige, por cima, dois defeitos
  * apontados pelo autor.

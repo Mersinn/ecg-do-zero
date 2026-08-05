@@ -1,4 +1,4 @@
-# ECG Ultimate Learning
+# ECG do Zero
 
 Curso interativo de eletrocardiograma para estudantes de medicina do ciclo clínico.
 Feito para quem **nunca leu um ECG** e precisa chegar ao nível de decisão clínica.
