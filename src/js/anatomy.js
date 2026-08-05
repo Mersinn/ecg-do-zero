@@ -570,7 +570,7 @@ const ESTILO = `
   }
   .an-tab:hover { color: var(--tinta); border-color: var(--linha-forte); }
   .an-tab[aria-selected="true"] {
-    background: var(--tinta); color: var(--papel); border-color: var(--tinta);
+    background: var(--selecao-recesso); color: var(--selecao-texto); border-color: var(--selecao-filete);
   }
 
   /* --- painel --- */

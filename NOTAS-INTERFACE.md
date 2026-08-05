@@ -214,3 +214,21 @@ Destes, só um foi tocado até aqui:
 O overflow horizontal, que era P1, parece já ter sido resolvido pelas guardas
 de `min-width: 0` do `refino.css`. Os outros cinco continuam de pé e não
 pertencem ao Bloco 0.
+
+---
+
+## 10. Tokens mínimos do estado selecionado
+
+**Criados no item 4 do Bloco 0, sem consolidar a paleta.** Os seis estados de
+escolha precisavam deixar a inversão branca antes de o item 3 reorganizar os
+tokens. Entraram somente os dois valores aprovados no `DECISOES.md` §1:
+
+- `--selecao-recesso: #10141A` — fundo rebaixado do estado escolhido;
+- `--selecao-filete: #5B5BF0` — borda ou filete de ação que marca a escolha.
+- `--selecao-texto: #F2F5F7` — texto principal legível sobre o recesso;
+- `--selecao-texto-secundario: #A7B0BA` — número ou medida subordinada.
+
+Eles ficam temporariamente no bloco `:root` escuro do `refino.css`. Os dois
+tokens de texto impedem que o tema claro, hoje inalcançável, produza texto
+escuro sobre esse recesso caso volte a ser ligado. O item 3 deve incorporá-los
+à consolidação sem mudar sua função semântica.
