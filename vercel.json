@@ -1,7 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+
+  "//": "Site estatico sem etapa de build. As tres linhas abaixo sao explicitas de proposito: sem elas a Vercel adota o preset 'Other', que usa a pasta public/ como diretorio de saida quando ela existe. Como public/ so tinha a imagem de capa, o site inteiro era publicado sem index.html e a raiz devolvia 404. A pasta foi renomeada para assets/ e a saida esta declarada como a propria raiz.",
+  "framework": null,
+  "buildCommand": null,
+  "outputDirectory": ".",
+
   "cleanUrls": true,
   "trailingSlash": false,
+
   "headers": [
     {
       "source": "/(.*)",
@@ -14,6 +21,10 @@
     {
       "source": "/src/(.*)",
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
     }
   ]
 }
